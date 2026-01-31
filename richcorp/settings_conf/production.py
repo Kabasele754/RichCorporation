@@ -24,7 +24,7 @@ CSP_HEADER = {
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django_tenants.postgresql_backend',
+        'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.environ.get('DB_NAME', 'richcorpdb'),
         'USER': os.environ.get('DB_USER', 'richcorpuser'),
         'PASSWORD': os.environ.get('DB_PASS', 'richcorppass'),

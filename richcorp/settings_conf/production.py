@@ -36,16 +36,16 @@ DB_PASS_FILE = os.getenv("DB_PASS_FILE")
 if DB_PASS_FILE and not DB_PASSWORD:
     DB_PASSWORD = read_secret(DB_PASS_FILE)
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("DB_NAME", "richcorpdb"),
-        "USER": os.getenv("DB_USER", "richcorpuser"),
-        "PASSWORD": DB_PASSWORD or "richcorppass",
-        "HOST": os.getenv("DB_HOST", "db"),
-        "PORT": os.getenv("DB_PORT", "5432"),
-    }
-}
+# DATABASES = {
+#     "default": {
+#         "ENGINE": "django.db.backends.postgresql",
+#         "NAME": os.getenv("DB_NAME", "richcorpdb"),
+#         "USER": os.getenv("DB_USER", "richcorpuser"),
+#         "PASSWORD": DB_PASSWORD or "richcorppass",
+#         "HOST": os.getenv("DB_HOST", "db"),
+#         "PORT": os.getenv("DB_PORT", "5432"),
+#     }
+# }
 
 
 # DATABASES = {
@@ -69,6 +69,13 @@ DATABASES = {
 #         "PORT": os.getenv("DB_PORT", ""),
 #     }
 # }
+
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
+    }
+}
 
 
 # static local this code for to search file css

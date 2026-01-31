@@ -22,27 +22,27 @@ CSP_HEADER = {
     
 }
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': os.environ.get('DB_NAME', 'richcorpdb'),
-#         'USER': os.environ.get('DB_USER', 'richcorpuser'),
-#         'PASSWORD': os.environ.get('DB_PASS', 'richcorppass'),
-#         'HOST': os.environ.get('DB_HOST', 'db'),
-#         'PORT': os.environ.get('DB_PORT', '5432'),
-#     }
-# }
-
 DATABASES = {
-    "default": {
-        "ENGINE": os.getenv("DB_ENGINE", "django.db.backends.sqlite3"),
-        "NAME": os.getenv("DB_NAME", str(BASE_DIR / "db.sqlite3")),
-        "USER": os.getenv("DB_USER", ""),
-        "PASSWORD": os.getenv("DB_PASSWORD", ""),
-        "HOST": os.getenv("DB_HOST", ""),
-        "PORT": os.getenv("DB_PORT", ""),
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.environ.get('DB_NAME', 'richcorpdb'),
+        'USER': os.environ.get('DB_USER', 'richcorpuser'),
+        'PASSWORD': os.environ.get('DB_PASS', 'richcorppass'),
+        'HOST': os.environ.get('DB_HOST', 'db'),
+        'PORT': os.environ.get('DB_PORT', '5432'),
     }
 }
+
+# DATABASES = {
+#     "default": {
+#         "ENGINE": os.getenv("DB_ENGINE", "django.db.backends.sqlite3"),
+#         "NAME": os.getenv("DB_NAME", str(BASE_DIR / "db.sqlite3")),
+#         "USER": os.getenv("DB_USER", ""),
+#         "PASSWORD": os.getenv("DB_PASSWORD", ""),
+#         "HOST": os.getenv("DB_HOST", ""),
+#         "PORT": os.getenv("DB_PORT", ""),
+#     }
+# }
 
 
 # static local this code for to search file css

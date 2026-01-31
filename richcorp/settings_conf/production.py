@@ -2,23 +2,23 @@ from .base import *
 
 DEBUG = True
 
-ALLOWED_HOSTS = ['66.94.124.105','www.richcorporations.com','richcorporations.com','api.richcorporations.com','localhost']
+ALLOWED_HOSTS = ['95.111.247.13','www.richcorporationsa.com','richcorporationsa.com','api.richcorporationsa.com','localhost']
 # Liste des domaines autorisés pour les connexions
 CSRF_TRUSTED_ORIGINS = [
-    "https://richcorporations.com",
-    "https://www.richcorporations.com",
-    'https://api.richcorporations.com',
+    "https://richcorporationsa.com",
+    "https://www.richcorporationsa.com",
+    'https://api.richcorporationsa.com',
 ]
 
 
 
 # Configuration de la politique de sécurité des contenus (CSP)
 CSP_HEADER = {
-    'default-src': ["'self'", "richcorporations.com"],
-    'script-src': ["'self'", "richcorporations.com"],
-    'style-src': ["'self'", "richcorporations.com"],
-    'img-src': ["'self'", "richcorporations.com"],
-    'font-src': ["'self'", "richcorporations.com"],
+    'default-src': ["'self'", "richcorporationsa.com"],
+    'script-src': ["'self'", "richcorporationsa.com"],
+    'style-src': ["'self'", "richcorporationsa.com"],
+    'img-src': ["'self'", "richcorporationsa.com"],
+    'font-src': ["'self'", "richcorporationsa.com"],
     
 }
 

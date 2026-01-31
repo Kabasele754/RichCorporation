@@ -1,23 +1,14 @@
-# Utilisez une image de base Nginx
 FROM nginx:latest
 
-# Créez un répertoire pour stocker les certificats SSL
-RUN mkdir -p /etc/nginx/ssl
+# (Optionnel) dhparam si tu veux vraiment
+RUN apt-get update && apt-get install -y openssl \
+  && openssl dhparam -out /etc/nginx/dhparam.pem 2048 \
+  && apt-get clean \
+  && rm -rf /var/lib/apt/lists/*
 
-# Installer Certbot et OpenSSL (pour générer dhparam.pem)
-RUN apt-get update && apt-get install -y certbot python3-certbot-nginx openssl
-
-# Générez le fichier Diffie-Hellman pour SSL
-RUN openssl dhparam -out /etc/nginx/dhparam.pem 2048
-
-# Copiez le fichier de configuration Nginx dans le conteneur
 COPY ./default.conf /etc/nginx/conf.d/default.conf
 
-# Exposez les ports 80 (HTTP) et 443 (HTTPS) pour le trafic entrant
-EXPOSE 80
-EXPOSE 443
-
-# Commande pour démarrer Nginx une fois le conteneur démarré
+EXPOSE 80 443
 CMD ["nginx", "-g", "daemon off;"]
 
 
@@ -27,8 +18,11 @@ CMD ["nginx", "-g", "daemon off;"]
 # # Créez un répertoire pour stocker les certificats SSL
 # RUN mkdir -p /etc/nginx/ssl
 
-# # Install Certbot
-# RUN apt-get update && apt-get install -y certbot python3-certbot-nginx
+# # Installer Certbot et OpenSSL (pour générer dhparam.pem)
+# RUN apt-get update && apt-get install -y certbot python3-certbot-nginx openssl
+
+# # Générez le fichier Diffie-Hellman pour SSL
+# RUN openssl dhparam -out /etc/nginx/dhparam.pem 2048
 
 # # Copiez le fichier de configuration Nginx dans le conteneur
 # COPY ./default.conf /etc/nginx/conf.d/default.conf
@@ -39,3 +33,4 @@ CMD ["nginx", "-g", "daemon off;"]
 
 # # Commande pour démarrer Nginx une fois le conteneur démarré
 # CMD ["nginx", "-g", "daemon off;"]
+

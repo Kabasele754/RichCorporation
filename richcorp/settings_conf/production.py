@@ -22,16 +22,44 @@ CSP_HEADER = {
     
 }
 
+
+import os
+from pathlib import Path
+
+def read_secret(path, default=""):
+    try:
+        with open(path, "r") as f:
+            return f.read().strip()
+    except Exception:
+        return default
+
+DB_PASS = os.environ.get("DB_PASS")
+DB_PASS_FILE = os.environ.get("DB_PASS_FILE")
+
+if not DB_PASS and DB_PASS_FILE:
+    DB_PASS = read_secret(DB_PASS_FILE)
+
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('DB_NAME', 'richcorpdb'),
-        'USER': os.environ.get('DB_USER', 'richcorpuser'),
-        'PASSWORD': os.environ.get('DB_PASS', 'richcorppass'),
-        'HOST': os.environ.get('DB_HOST', 'db'),
-        'PORT': os.environ.get('DB_PORT', '5432'),
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.environ.get("DB_NAME", "richcorpdb"),
+        "USER": os.environ.get("DB_USER", "richcorpuser"),
+        "PASSWORD": DB_PASS or "richcorppass",
+        "HOST": os.environ.get("DB_HOST", "db"),
+        "PORT": os.environ.get("DB_PORT", "5432"),
     }
 }
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': os.environ.get('DB_NAME', 'richcorpdb'),
+#         'USER': os.environ.get('DB_USER', 'richcorpuser'),
+#         'PASSWORD': os.environ.get('DB_PASS', 'richcorppass'),
+#         'HOST': os.environ.get('DB_HOST', 'db'),
+#         'PORT': os.environ.get('DB_PORT', '5432'),
+#     }
+# }
 
 # DATABASES = {
 #     "default": {

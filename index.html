@@ -1,0 +1,938 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rich Corporation — De Nous vers Vous</title>
+  <meta name="description" content="Accompagnement étudiants en Afrique du Sud : inscriptions, hébergement, visas & immigration, assurance médicale, soutien en français." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    :root{
+      --bg0:#050816;
+      --bg1:#070C1F;
+      --surface:rgba(255,255,255,.06);
+      --surface2:rgba(255,255,255,.09);
+      --line:rgba(255,255,255,.12);
+      --text:#EAF0FF;
+      --muted:rgba(234,240,255,.70);
+
+      --navy:#0B1636;
+      --cyan:#33BCE6;
+      --mint:#2FE0C8;
+
+      --shadow: 0 24px 80px rgba(0,0,0,.55);
+      --shadow2: 0 18px 55px rgba(0,0,0,.40);
+
+      --r16:16px;
+      --r20:20px;
+      --r28:28px;
+
+      --max: 1180px;
+    }
+
+    *{ box-sizing:border-box; }
+    html{ scroll-behavior:smooth; }
+    body{
+      margin:0;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color:var(--text);
+      background:
+        radial-gradient(1200px 700px at 15% 10%, rgba(51,188,230,.23), transparent 62%),
+        radial-gradient(1000px 700px at 85% 22%, rgba(47,224,200,.16), transparent 62%),
+        radial-gradient(1200px 800px at 50% 110%, rgba(11,22,54,.85), transparent 65%),
+        linear-gradient(180deg, var(--bg0), var(--bg1));
+      overflow-x:hidden;
+    }
+
+    a{ color:inherit; text-decoration:none; }
+    img{ max-width:100%; display:block; }
+
+    .container{ width:min(var(--max), calc(100% - 40px)); margin:0 auto; }
+
+    /* Subtle grid texture */
+    .texture{
+      position:fixed; inset:0;
+      pointer-events:none;
+      background:
+        linear-gradient(to right, rgba(255,255,255,.045) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,.045) 1px, transparent 1px);
+      background-size: 84px 84px;
+      opacity:.08;
+      mask-image: radial-gradient(circle at 30% 10%, black 0 55%, transparent 75%);
+    }
+
+    /* NAV */
+    header{
+      position:sticky; top:0; z-index:100;
+      backdrop-filter: blur(14px);
+      background: linear-gradient(to bottom, rgba(5,8,22,.85), rgba(5,8,22,.35));
+      border-bottom:1px solid rgba(255,255,255,.07);
+    }
+    .nav{
+      display:flex; align-items:center; justify-content:space-between;
+      padding: 14px 0;
+      gap: 14px;
+    }
+    .brand{
+      display:flex; align-items:center; gap:12px;
+      min-width: 220px;
+    }
+    .brandLogo{
+      width: 44px; height: 44px;
+      border-radius: 14px;
+      overflow:hidden;
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.12);
+      box-shadow: 0 12px 28px rgba(51,188,230,.16);
+      display:grid; place-items:center;
+      flex: 0 0 auto;
+      
+    }
+    .brandLogo img{
+      width: 100%; height:100%;
+      
+       object-fit: contain;   /* IMPORTANT */
+  object-position: center;
+    }
+    .brandText strong{
+      display:block;
+      font-weight:800;
+      letter-spacing:.6px;
+      font-size: 13px;
+      text-transform: uppercase;
+      line-height:1.1;
+    }
+    .brandText span{
+      display:block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+      line-height:1.15;
+    }
+
+    nav.desktop{
+      display:flex;
+      align-items:center;
+      gap: 6px;
+      padding: 6px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.08);
+    }
+    nav.desktop a{
+      padding: 10px 14px;
+      border-radius: 999px;
+      font-size: 14px;
+      color: rgba(234,240,255,.84);
+      transition:.22s ease;
+      position:relative;
+    }
+    nav.desktop a:hover{
+      background: rgba(255,255,255,.07);
+      color: rgba(234,240,255,1);
+    }
+    nav.desktop a.active{
+      background: rgba(51,188,230,.14);
+      border: 1px solid rgba(51,188,230,.22);
+      color: rgba(234,240,255,1);
+    }
+
+    .navActions{
+      display:flex; align-items:center; gap:10px;
+      flex: 0 0 auto;
+    }
+    .btn{
+      display:inline-flex; align-items:center; justify-content:center; gap:10px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.06);
+      color:var(--text);
+      font-weight:700;
+      font-size: 14px;
+      box-shadow: var(--shadow2);
+      transition: .22s ease;
+      cursor:pointer;
+      user-select:none;
+      white-space:nowrap;
+    }
+    .btn:hover{ transform: translateY(-1px); background: rgba(255,255,255,.09); }
+    .btn.primary{
+      border:1px solid rgba(51,188,230,.35);
+      background: linear-gradient(135deg, rgba(51,188,230,.95), rgba(47,224,200,.75));
+      color: #04142C;
+    }
+
+    .iconBtn{
+      width: 44px; height: 44px;
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.06);
+      color: rgba(234,240,255,.95);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      box-shadow: var(--shadow2);
+    }
+
+    /* MOBILE DRAWER */
+    .drawerOverlay{
+      position:fixed; inset:0;
+      background: rgba(0,0,0,.55);
+      opacity:0; pointer-events:none;
+      transition: .22s ease;
+      z-index: 150;
+    }
+    .drawer{
+      position:fixed;
+      top:0; right:0; height:100%;
+      width: min(360px, 92vw);
+      background: rgba(7,12,31,.88);
+      border-left: 1px solid rgba(255,255,255,.10);
+      backdrop-filter: blur(18px);
+      transform: translateX(102%);
+      transition: .22s ease;
+      z-index: 160;
+      box-shadow: -24px 0 70px rgba(0,0,0,.55);
+      padding: 16px;
+      display:flex; flex-direction:column; gap: 12px;
+    }
+    .drawerHead{
+      display:flex; align-items:center; justify-content:space-between;
+      gap:10px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+    }
+    .drawerNav a{
+      display:block;
+      padding: 14px 12px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,.08);
+      background: rgba(255,255,255,.04);
+      margin-top: 10px;
+      font-weight: 700;
+      color: rgba(234,240,255,.92);
+    }
+    .drawerNav a:hover{ background: rgba(255,255,255,.07); }
+
+    body.drawerOpen .drawerOverlay{ opacity:1; pointer-events:auto; }
+    body.drawerOpen .drawer{ transform: translateX(0%); }
+
+    /* HERO */
+    .hero{
+      padding: 64px 0 40px;
+      position:relative;
+    }
+    .heroGrid{
+      display:grid;
+      grid-template-columns: 1.12fr .88fr;
+      gap: 20px;
+      align-items:stretch;
+    }
+    .heroCard{
+      border-radius: var(--r28);
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.05);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+      position:relative;
+    }
+
+    .heroLeft{
+      padding: 34px 34px 30px;
+      min-height: 460px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03)),
+        radial-gradient(800px 500px at 15% 10%, rgba(51,188,230,.18), transparent 60%);
+    }
+    .kicker{
+      display:inline-flex; align-items:center; gap:10px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(51,188,230,.30);
+      background: rgba(51,188,230,.10);
+      font-size: 13px;
+      color: rgba(234,240,255,.9);
+      margin-bottom: 14px;
+    }
+    .dot{
+      width:10px; height:10px;
+      border-radius: 99px;
+      background: linear-gradient(135deg, var(--cyan), var(--mint));
+      box-shadow: 0 0 0 6px rgba(51,188,230,.10);
+    }
+
+    h1{
+      margin: 0 0 10px;
+      font-size: clamp(34px, 4.2vw, 56px);
+      line-height: 1.03;
+      letter-spacing: -1.2px;
+    }
+    .gradient{
+      background: linear-gradient(135deg, rgba(234,240,255,1), rgba(51,188,230,1));
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .lead{
+      margin: 14px 0 22px;
+      color: rgba(234,240,255,.78);
+      font-size: 15.5px;
+      line-height: 1.75;
+      max-width: 62ch;
+    }
+
+    .heroBtns{
+      display:flex; flex-wrap:wrap; gap: 12px;
+      margin-top: 14px;
+    }
+
+    .badges{
+      display:flex; flex-wrap:wrap; gap:10px;
+      margin-top: 22px;
+    }
+    .badge{
+      padding: 10px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.10);
+      color: rgba(234,240,255,.85);
+      font-weight: 600;
+      font-size: 13px;
+      display:inline-flex; gap:10px; align-items:center;
+    }
+
+    /* Right: Hero image + service highlights */
+    .heroRight{
+      display:grid;
+      grid-template-rows: 1fr auto;
+      gap: 12px;
+      padding: 14px;
+      background:
+        radial-gradient(700px 520px at 70% 20%, rgba(51,188,230,.20), transparent 60%),
+        radial-gradient(600px 420px at 30% 90%, rgba(47,224,200,.14), transparent 60%),
+        rgba(255,255,255,.03);
+    }
+    .heroImage{
+      border-radius: 22px;
+      overflow:hidden;
+      position:relative;
+      min-height: 240px;
+      border: 1px solid rgba(255,255,255,.12);
+      box-shadow: var(--shadow2);
+      background: #111;
+    }
+    .heroImage img{
+      width:100%; height:100%;
+      object-fit: cover;
+      transform: scale(1.03);
+    }
+    .heroImage::after{
+      content:"";
+      position:absolute; inset:0;
+      background:
+        linear-gradient(to top, rgba(5,8,22,.75), rgba(5,8,22,.15) 55%, rgba(5,8,22,.10));
+    }
+    .heroImageCaption{
+      position:absolute; left:14px; right:14px; bottom:14px;
+      display:flex; flex-direction:column; gap:4px;
+    }
+    .heroImageCaption strong{
+      font-size: 14px;
+      letter-spacing:.2px;
+    }
+    .heroImageCaption span{
+      font-size: 12px;
+      color: rgba(234,240,255,.75);
+      line-height:1.35;
+    }
+
+    .miniServices{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+    .miniService{
+      border-radius: 18px;
+      padding: 12px 12px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.045);
+      display:flex; gap: 12px;
+      align-items:flex-start;
+    }
+    .miniIcon{
+      width: 38px; height: 38px;
+      border-radius: 14px;
+      display:grid; place-items:center;
+      background: rgba(51,188,230,.12);
+      border: 1px solid rgba(51,188,230,.22);
+      flex: 0 0 auto;
+    }
+    .miniService strong{ display:block; font-size: 14px; }
+    .miniService span{
+      display:block;
+      font-size: 12.8px;
+      color: rgba(234,240,255,.72);
+      line-height:1.5;
+      margin-top: 4px;
+    }
+
+    /* SECTIONS */
+    section{ padding: 46px 0; }
+    .sectionHead{
+      display:flex; align-items:flex-end; justify-content:space-between;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+    .sectionHead h2{
+      margin:0;
+      font-size: 28px;
+      letter-spacing: -0.6px;
+    }
+    .sectionHead p{
+      margin:0;
+      color: var(--muted);
+      max-width: 70ch;
+      line-height:1.7;
+      font-size: 14px;
+    }
+
+    .grid2{ display:grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    .card{
+      border-radius: var(--r28);
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.05);
+      box-shadow: var(--shadow2);
+      padding: 22px;
+      position:relative;
+      overflow:hidden;
+    }
+    .card::after{
+      content:"";
+      position:absolute;
+      width: 320px; height: 320px;
+      right: -160px; top:-160px;
+      background: radial-gradient(circle at 30% 30%, rgba(51,188,230,.18), transparent 65%);
+      opacity:.9;
+      pointer-events:none;
+    }
+    .card h3{ margin:0 0 10px; font-size: 16px; letter-spacing:.2px; }
+    .card p{ margin:0; color: rgba(234,240,255,.74); line-height:1.75; font-size: 14px; position:relative; }
+
+    .aboutSplit{
+      display:grid; grid-template-columns: 1.2fr .8fr;
+      gap: 14px;
+      align-items:stretch;
+    }
+    .aboutImg{
+      border-radius: 24px;
+      overflow:hidden;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.04);
+      box-shadow: var(--shadow2);
+      min-height: 260px;
+      position:relative;
+    }
+    .aboutImg img{
+      width:100%; height:100%;
+      object-fit: cover;
+    }
+    .aboutImg::after{
+      content:"";
+      position:absolute; inset:0;
+      background: linear-gradient(to top, rgba(5,8,22,.72), rgba(5,8,22,.10) 60%);
+    }
+
+    /* Services grid */
+    .servicesGrid{
+      display:grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+      margin-top: 16px;
+    }
+    .serviceBig{
+      border-radius: 26px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.045));
+      padding: 18px;
+      position:relative;
+      overflow:hidden;
+      box-shadow: var(--shadow2);
+      transition: .22s ease;
+    }
+    .serviceBig:hover{ transform: translateY(-2px); }
+    .serviceBig .top{ display:flex; align-items:center; gap:12px; margin-bottom: 10px; position:relative; }
+    .serviceBig h3{ margin:0; font-size: 16px; letter-spacing:.2px; }
+    .serviceBig p{ margin:0; color: rgba(234,240,255,.74); line-height:1.7; font-size: 14px; position:relative; }
+    .serviceBig::after{
+      content:"";
+      position:absolute;
+      width: 300px; height: 300px;
+      right:-160px; bottom:-160px;
+      background: radial-gradient(circle at 30% 30%, rgba(47,224,200,.14), transparent 65%);
+      opacity:.9;
+      pointer-events:none;
+    }
+
+    /* Contact band */
+    .ctaBand{
+      border-radius: 30px;
+      border: 1px solid rgba(51,188,230,.25);
+      background: linear-gradient(135deg, rgba(51,188,230,.20), rgba(47,224,200,.10));
+      box-shadow: var(--shadow);
+      padding: 26px;
+      display:flex; justify-content:space-between; align-items:center;
+      gap: 16px;
+    }
+    .ctaBand h3{ margin:0; font-size: 18px; }
+    .ctaBand p{ margin:6px 0 0; color: rgba(234,240,255,.78); line-height:1.6; font-size: 14px; }
+
+    /* Footer */
+    footer{
+      padding: 28px 0 34px;
+      border-top: 1px solid rgba(255,255,255,.08);
+      color: rgba(234,240,255,.70);
+    }
+    .footerGrid{
+      display:flex; align-items:center; justify-content:space-between;
+      gap: 12px;
+      flex-wrap:wrap;
+    }
+    .pill{
+      display:inline-flex; align-items:center; gap:10px;
+      padding: 10px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.10);
+      font-size: 13px;
+    }
+
+    /* Reveal */
+    .reveal{ opacity:0; transform: translateY(10px); transition: .7s ease; }
+    .reveal.show{ opacity:1; transform: translateY(0); }
+
+    /* Responsive */
+    @media (max-width: 980px){
+      .heroGrid{ grid-template-columns: 1fr; }
+      .heroLeft{ min-height: auto; }
+      .aboutSplit{ grid-template-columns: 1fr; }
+      .grid2{ grid-template-columns: 1fr; }
+      .servicesGrid{ grid-template-columns: 1fr; }
+    }
+    @media (max-width: 860px){
+      nav.desktop{ display:none; }
+      .navActions .btn{ display:none; }
+      .iconBtn{ display:inline-flex; }
+      .brand{ min-width: unset; }
+    }
+    @media (prefers-reduced-motion: reduce){
+      html{ scroll-behavior:auto; }
+      .reveal{ transition:none; transform:none; opacity:1; }
+      .btn, .serviceBig{ transition:none; }
+    }
+
+    /* Contact band (responsive fix) */
+.ctaBand{
+  border-radius: 30px;
+  border: 1px solid rgba(51,188,230,.25);
+  background: linear-gradient(135deg, rgba(51,188,230,.20), rgba(47,224,200,.10));
+  box-shadow: var(--shadow);
+  padding: 26px;
+
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  align-items: center;
+}
+
+.ctaBand .ctaText h3{ margin:0; font-size: 18px; }
+.ctaBand .ctaText p{ margin:6px 0 0; color: rgba(234,240,255,.78); line-height:1.6; font-size: 14px; }
+
+.ctaBand .ctaActions{
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.ctaBand .ctaActions a{
+  flex: 0 0 auto;
+}
+
+/* Mobile: stack + full width buttons */
+@media (max-width: 680px){
+  .ctaBand{
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+  .ctaBand .ctaActions{
+    justify-content: stretch;
+  }
+  .ctaBand .ctaActions a{
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+  </style>
+</head>
+
+<body>
+  <div class="texture" aria-hidden="true"></div>
+
+  <header>
+    <div class="container">
+      <div class="nav">
+        <a class="brand" href="#top" aria-label="Rich Corporation">
+          <div class="brandLogo" title="Logo">
+            <!-- Remplace ce fichier par ton logo officiel -->
+            <img src="assets/logo-rich.png" alt="Rich Corporation" onerror="this.style.display='none'; this.parentElement.style.background='linear-gradient(135deg, rgba(51,188,230,.95), rgba(47,224,200,.75))'; this.parentElement.innerHTML='<span style=&quot;font-weight:900;color:#04142C&quot;>RC</span>';">
+          </div>
+          <div class="brandText">
+            <strong>RICH CORPORATION</strong>
+            <span>Accompagnement étudiants — Afrique du Sud</span>
+          </div>
+        </a>
+
+        <nav class="desktop" aria-label="Navigation">
+          <a href="#about" data-spy="about">Qui sommes-nous</a>
+          <a href="#why" data-spy="why">Pourquoi nous choisir</a>
+          <a href="#services" data-spy="services">Services</a>
+          <a href="#contact" data-spy="contact">Contact</a>
+        </nav>
+
+        <div class="navActions">
+          <a class="btn" href="tel:+27633605203">Appeler</a>
+          <a class="btn primary" href="#contact">Demander un accompagnement</a>
+
+          <button class="iconBtn" id="openDrawer" aria-label="Ouvrir le menu">☰</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Drawer -->
+  <div class="drawerOverlay" id="drawerOverlay" aria-hidden="true"></div>
+  <aside class="drawer" id="drawer" aria-label="Menu mobile" role="dialog" aria-modal="true">
+    <div class="drawerHead">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="brandLogo" style="width:40px;height:40px;">
+          <img src="assets/logo-rich.png" alt="Rich Corporation">
+        </div>
+        <div style="line-height:1.1">
+          <div style="font-weight:900;letter-spacing:.6px;font-size:12px;text-transform:uppercase;">Rich Corporation</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px;">Menu</div>
+        </div>
+      </div>
+      <button class="iconBtn" id="closeDrawer" aria-label="Fermer le menu" style="display:inline-flex;">✕</button>
+    </div>
+
+    <div class="drawerNav">
+      <a href="#about">Qui sommes-nous</a>
+      <a href="#why">Pourquoi nous choisir</a>
+      <a href="#services">Services</a>
+      <a href="#contact">Contact</a>
+
+      <a class="btn primary" href="tel:+27633605203" style="margin-top:12px; justify-content:center;">📞 +27 63 360 5203</a>
+      <a class="btn" href="https://www.richcorporation.co.za" target="_blank" rel="noopener" style="justify-content:center;">🌐 richcorporation.co.za</a>
+    </div>
+  </aside>
+
+  <main id="top">
+    <!-- HERO -->
+    <section class="hero">
+      <div class="container">
+        <div class="heroGrid">
+          <div class="heroCard reveal">
+            <div class="heroLeft">
+              <div class="kicker"><span class="dot"></span><span>De Nous vers Vous</span></div>
+
+              <h1>nous <span class="gradient">vous facilitons</span> votre vie</h1>
+
+              <p class="lead">
+                Étudiez en toute sérénité en nous confiant la gestion de votre logement,
+                de vos inscriptions scolaires et de vos démarches d'immigration.
+                Notre cabinet vous offre un soutien sur mesure, incluant une aide spécialisée
+                pour vos écrits en français. Votre réussite en Afrique du Sud commence par un
+                accompagnement de confiance.
+              </p>
+
+              <div class="heroBtns">
+                <a class="btn primary" href="#contact">Commencer maintenant</a>
+                <a class="btn" href="#services">Voir les services</a>
+              </div>
+
+              <div class="badges" aria-label="Atouts">
+                <div class="badge">✅ Dossiers complets & conformes</div>
+                <div class="badge">🛂 Immigration & permis d’étude</div>
+                <div class="badge">🏠 Logements sécurisés</div>
+                <div class="badge">📝 Soutien en français</div>
+              </div>
+            </div>
+          </div>
+
+          <aside class="heroCard reveal">
+            <div class="heroRight">
+              <div class="heroImage">
+                <!-- Mets une belle image premium dans assets/hero.jpg -->
+                <img src="assets/hero.png" alt="Étudier en Afrique du Sud" onerror="this.src='https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1800&q=80'">
+                <div class="heroImageCaption">
+                  <strong>Accompagnement premium</strong>
+                  <span>Admissions • Hébergement • Immigration • Assurance médicale</span>
+                </div>
+              </div>
+
+              <div class="miniServices" aria-label="Services phares">
+                <div class="miniService">
+                  <div class="miniIcon">🎓</div>
+                  <div>
+                    <strong>Inscriptions Scolaires</strong>
+                    <span>Orientation + gestion complète du dossier d’admission.</span>
+                  </div>
+                </div>
+                <div class="miniService">
+                  <div class="miniIcon">🏠</div>
+                  <div>
+                    <strong>Hébergement Étudiant</strong>
+                    <span>Logements sécurisés, accrédités, proches du campus.</span>
+                  </div>
+                </div>
+                <div class="miniService">
+                  <div class="miniIcon">🛂</div>
+                  <div>
+                    <strong>Visas & Immigration</strong>
+                    <span>Renouvellement du permis d’étude (VFS Global), conformité totale.</span>
+                  </div>
+                </div>
+                <div class="miniService">
+                  <div class="miniIcon">🩺</div>
+                  <div>
+                    <strong>Assistance Médicale</strong>
+                    <span>Assurances sud-africaines adaptées aux exigences d’immigration.</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABOUT + WHY -->
+    <section id="about">
+      <div class="container">
+        <div class="sectionHead reveal">
+          <div>
+            <h2>Qui sommes-nous ?</h2>
+            <p>
+              Entreprise panafricaine dédiée à l’accompagnement des étudiants vers la réussite de leurs études en Afrique du Sud.
+            </p>
+          </div>
+        </div>
+
+        <div class="aboutSplit">
+          <div class="card reveal">
+            <h3>Notre mission</h3>
+            <p>
+              Nous accompagnons les étudiants de l'inscription scolaire au logement, en passant par le renouvellement des visas
+              et le soutien en français. Avec Rich Corporation, franchissez les frontières de la réussite en toute sérénité.
+            </p>
+          </div>
+
+          <div class="aboutImg reveal" aria-label="Image à propos">
+            <!-- Optionnel : place une image dans assets/about.jpg -->
+            <img src="assets/about.png" alt="Rich Corporations" onerror="this.src='https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=1800&q=80'">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="why">
+      <div class="container">
+        <div class="sectionHead reveal">
+          <div>
+            <h2>Pourquoi nous choisir ?</h2>
+            <p>Une approche fiable, claire et rapide — pensée pour sécuriser votre parcours académique.</p>
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div class="card reveal">
+            <h3>🌍 Profondeur d’expertise du secteur</h3>
+            <p>Expertise panafricaine : compréhension profonde des défis des étudiants du continent.</p>
+          </div>
+
+          <div class="card reveal">
+            <h3>🧠 Expertise</h3>
+            <p>
+              Nous simplifions vos démarches de visa, de logement et d'inscription scolaire pour garantir
+              un parcours académique serein et maîtrisé.
+            </p>
+          </div>
+
+          <div class="card reveal">
+            <h3>⚡ Optimisation rapide</h3>
+            <p>Nous accélérons votre réussite en transformant vos démarches en résultats concrets.</p>
+          </div>
+
+          <div class="card reveal">
+            <h3>✅ Conformité & sérénité</h3>
+            <p>Préparation et vérification des documents pour limiter les erreurs et les retards.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SERVICES -->
+    <section id="services">
+      <div class="container">
+        <div class="sectionHead reveal">
+          <div>
+            <h2>Services</h2>
+            <p>Admissions, logement, immigration, assurance médicale — un accompagnement sur mesure.</p>
+          </div>
+        </div>
+
+        <div class="servicesGrid">
+          <article class="serviceBig reveal">
+            <div class="top">
+              <div class="miniIcon">🎓</div>
+              <h3>Inscriptions Scolaires</h3>
+            </div>
+            <p>
+              Nous vous orientons vers les meilleures écoles d'anglais et gérons l’intégralité
+              de votre dossier d'admission pour garantir votre place.
+            </p>
+          </article>
+
+          <article class="serviceBig reveal">
+            <div class="top">
+              <div class="miniIcon">🏠</div>
+              <h3>Hébergement Étudiant</h3>
+            </div>
+            <p>
+              Nous sélectionnons des logements sécurisés et accrédités, proches de votre campus,
+              tout en sécurisant votre contrat de bail.
+            </p>
+          </article>
+
+          <article class="serviceBig reveal">
+            <div class="top">
+              <div class="miniIcon">🛂</div>
+              <h3>Visas & Immigration</h3>
+            </div>
+            <p>
+              Notre expertise facilite le renouvellement de votre permis d'étude auprès de VFS Global,
+              en assurant la conformité totale de vos documents.
+            </p>
+          </article>
+
+          <article class="serviceBig reveal">
+            <div class="top">
+              <div class="miniIcon">🩺</div>
+              <h3>Assistance Médicale</h3>
+            </div>
+            <p>
+              Nous vous aidons à souscrire aux meilleures assurances médicales sud-africaines,
+              obligatoires et adaptées aux exigences de l'immigration.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- CONTACT -->
+    <section id="contact">
+  <div class="container">
+    <div class="ctaBand reveal">
+      <div class="ctaText">
+        <h3>Prêt(e) à démarrer votre parcours en Afrique du Sud ?</h3>
+        <p>Contactez Rich Corporation pour un accompagnement fiable et premium.</p>
+      </div>
+
+      <div class="ctaActions">
+        <a class="btn primary" href="tel:+27633605203">📞 +27 63 360 5203</a>
+        <a class="btn" href="https://www.richcorporation.co.za" target="_blank" rel="noopener">
+          🌐 www.richcorporation.co.za
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+    <footer>
+      <div class="container">
+        <div class="footerGrid">
+          <div class="pill">📞 <span>+27 63 360 5203</span></div>
+          <div class="pill">🌐 <span>www.richcorporation.co.za</span></div>
+          <div class="pill">© <span id="year"></span> Rich Corporation</div>
+        </div>
+      </div>
+    </footer>
+  </main>
+
+  <script>
+    // Year
+    document.getElementById("year").textContent = new Date().getFullYear();
+
+    // Drawer
+    const openBtn = document.getElementById("openDrawer");
+    const closeBtn = document.getElementById("closeDrawer");
+    const overlay = document.getElementById("drawerOverlay");
+    const drawer = document.getElementById("drawer");
+
+    function openDrawer(){
+      document.body.classList.add("drawerOpen");
+      overlay.setAttribute("aria-hidden","false");
+      // focus close button for accessibility
+      setTimeout(() => closeBtn?.focus(), 50);
+    }
+    function closeDrawer(){
+      document.body.classList.remove("drawerOpen");
+      overlay.setAttribute("aria-hidden","true");
+      openBtn?.focus();
+    }
+
+    openBtn?.addEventListener("click", openDrawer);
+    closeBtn?.addEventListener("click", closeDrawer);
+    overlay?.addEventListener("click", closeDrawer);
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && document.body.classList.contains("drawerOpen")) closeDrawer();
+    });
+
+    // Auto-close drawer on link click
+    drawer?.querySelectorAll("a").forEach(a => a.addEventListener("click", closeDrawer));
+
+    // Reveal on scroll
+    const els = Array.from(document.querySelectorAll(".reveal"));
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) e.target.classList.add("show"); });
+    }, { threshold: 0.12 });
+    els.forEach(el => io.observe(el));
+
+    // Scrollspy (active nav link)
+    const spyLinks = Array.from(document.querySelectorAll('nav.desktop a[data-spy]'));
+    const sections = spyLinks
+      .map(a => document.getElementById(a.dataset.spy))
+      .filter(Boolean);
+
+    const spy = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        const id = entry.target.id;
+        spyLinks.forEach(a => a.classList.toggle("active", a.dataset.spy === id));
+      });
+    }, { rootMargin: "-45% 0px -45% 0px", threshold: 0 });
+
+    sections.forEach(s => spy.observe(s));
+  </script>
+</body>
+</html>

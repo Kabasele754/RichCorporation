@@ -1,0 +1,769 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rich Corporation — De Nous vers Vous</title>
+  <meta name="description" content="Accompagnement étudiants en Afrique du Sud : inscriptions, hébergement, visas & immigration, assurance médicale, soutien en français." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    :root{
+      --bg0:#050816; --bg1:#070C1F;
+      --text:#EAF0FF; --muted:rgba(234,240,255,.70);
+      --cyan:#33BCE6; --mint:#2FE0C8;
+      --shadow: 0 24px 80px rgba(0,0,0,.55);
+      --shadow2: 0 18px 55px rgba(0,0,0,.40);
+      --r28:28px; --max:1180px;
+      --wa:#25D366;
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{
+      margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; color:var(--text);
+      background:
+        radial-gradient(1200px 700px at 15% 10%, rgba(51,188,230,.23), transparent 62%),
+        radial-gradient(1000px 700px at 85% 22%, rgba(47,224,200,.16), transparent 62%),
+        radial-gradient(1200px 800px at 50% 110%, rgba(11,22,54,.85), transparent 65%),
+        linear-gradient(180deg, var(--bg0), var(--bg1));
+      overflow-x:hidden;
+    }
+    a{color:inherit;text-decoration:none}
+    img{max-width:100%;display:block}
+    .container{width:min(var(--max), calc(100% - 40px)); margin:0 auto;}
+    .texture{position:fixed;inset:0;pointer-events:none;background:
+      linear-gradient(to right, rgba(255,255,255,.045) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,.045) 1px, transparent 1px);
+      background-size:84px 84px; opacity:.08;
+      mask-image: radial-gradient(circle at 30% 10%, black 0 55%, transparent 75%);
+    }
+
+    header{position:sticky;top:0;z-index:100;backdrop-filter:blur(14px);
+      background:linear-gradient(to bottom, rgba(5,8,22,.85), rgba(5,8,22,.35));
+      border-bottom:1px solid rgba(255,255,255,.07);
+    }
+    .nav{display:flex;align-items:center;justify-content:space-between;padding:14px 0;gap:14px;}
+    .brand{display:flex;align-items:center;gap:12px;}
+    .brandLogo{width:44px;height:44px;border-radius:14px;overflow:hidden;
+      background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);
+      box-shadow:0 12px 28px rgba(51,188,230,.16);display:grid;place-items:center;flex:0 0 auto;}
+    .brandLogo img{width:100%;height:100%;object-fit:cover}
+    .brandText strong{display:block;font-weight:800;letter-spacing:.6px;font-size:13px;text-transform:uppercase;line-height:1.1}
+    .brandText span{display:block;font-size:12px;color:var(--muted);margin-top:4px;line-height:1.15}
+
+    nav.desktop{display:flex;align-items:center;gap:6px;padding:6px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)}
+    nav.desktop a{padding:10px 14px;border-radius:999px;font-size:14px;color:rgba(234,240,255,.84);transition:.22s ease;white-space:nowrap}
+    nav.desktop a:hover{background:rgba(255,255,255,.07);color:rgba(234,240,255,1)}
+    nav.desktop a.active{background:rgba(51,188,230,.14);border:1px solid rgba(51,188,230,.22);color:rgba(234,240,255,1)}
+    .navActions{display:flex;align-items:center;gap:10px;flex:0 0 auto}
+
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;
+      padding:12px 14px;border-radius:14px;border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.06);color:var(--text);font-weight:700;font-size:14px;
+      box-shadow:var(--shadow2);transition:.22s ease;cursor:pointer;user-select:none;white-space:nowrap}
+    .btn:hover{transform:translateY(-1px);background:rgba(255,255,255,.09)}
+    .btn.primary{border:1px solid rgba(51,188,230,.35);
+      background:linear-gradient(135deg, rgba(51,188,230,.95), rgba(47,224,200,.75));color:#04142C}
+    .btn.small{padding:10px 12px;border-radius:12px;font-size:13px;box-shadow:none}
+    .iconBtn{width:44px;height:44px;border-radius:14px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);
+      color:rgba(234,240,255,.95);display:none;align-items:center;justify-content:center;box-shadow:var(--shadow2)}
+
+    .drawerOverlay{position:fixed;inset:0;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:.22s ease;z-index:150}
+    .drawer{position:fixed;top:0;right:0;height:100%;width:min(360px,92vw);background:rgba(7,12,31,.88);
+      border-left:1px solid rgba(255,255,255,.10);backdrop-filter:blur(18px);
+      transform:translateX(102%);transition:.22s ease;z-index:160;box-shadow:-24px 0 70px rgba(0,0,0,.55);
+      padding:16px;display:flex;flex-direction:column;gap:12px}
+    .drawerHead{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.08)}
+    .drawerNav a{display:block;padding:14px 12px;border-radius:16px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04);margin-top:10px;font-weight:700}
+    .drawerNav a:hover{background:rgba(255,255,255,.07)}
+    body.drawerOpen .drawerOverlay{opacity:1;pointer-events:auto}
+    body.drawerOpen .drawer{transform:translateX(0%)}
+
+    section{padding:54px 0}
+    .hero{padding:64px 0 40px}
+    .heroGrid{display:grid;grid-template-columns:1.12fr .88fr;gap:20px;align-items:stretch}
+    .heroCard{border-radius:var(--r28);border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);box-shadow:var(--shadow);overflow:hidden}
+    .heroLeft{padding:34px;min-height:500px;background:
+      linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03)),
+      radial-gradient(800px 500px at 15% 10%, rgba(51,188,230,.18), transparent 60%)}
+    .kicker{display:inline-flex;align-items:center;gap:10px;padding:8px 12px;border-radius:999px;border:1px solid rgba(51,188,230,.30);background:rgba(51,188,230,.10);font-size:13px;margin-bottom:14px}
+    .dot{width:10px;height:10px;border-radius:99px;background:linear-gradient(135deg, var(--cyan), var(--mint));box-shadow:0 0 0 6px rgba(51,188,230,.10)}
+    h1{margin:0 0 10px;font-size:clamp(34px,4.2vw,56px);line-height:1.03;letter-spacing:-1.2px}
+    .gradient{background:linear-gradient(135deg, rgba(234,240,255,1), rgba(51,188,230,1));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+    .lead{margin:14px 0 22px;color:rgba(234,240,255,.78);font-size:15.5px;line-height:1.75;max-width:62ch}
+    .heroBtns{display:flex;flex-wrap:wrap;gap:12px;margin-top:14px}
+    .badges{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+    .badge{padding:10px 12px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.10);font-weight:600;font-size:13px;color:rgba(234,240,255,.85)}
+
+    .heroRight{display:grid;grid-template-rows:1fr auto;gap:12px;padding:14px;background:
+      radial-gradient(700px 520px at 70% 20%, rgba(51,188,230,.20), transparent 60%),
+      radial-gradient(600px 420px at 30% 90%, rgba(47,224,200,.14), transparent 60%),
+      rgba(255,255,255,.03)}
+
+    .imageFrame{border-radius:22px;overflow:hidden;position:relative;border:1px solid rgba(255,255,255,.12);box-shadow:var(--shadow2);background:#111}
+    .imageFrame img{width:100%;height:100%;object-fit:cover;transform:scale(1.03);filter:saturate(1.04) contrast(1.05)}
+    .imageFrame::after{content:"";position:absolute;inset:0;background:
+      radial-gradient(900px 500px at 20% 0%, rgba(51,188,230,.18), transparent 65%),
+      linear-gradient(to top, rgba(5,8,22,.78), rgba(5,8,22,.16) 55%, rgba(5,8,22,.10));pointer-events:none}
+    .heroImage{min-height:260px}
+    .heroImage img{object-position:50% 35%}
+    .heroImageCaption{position:absolute;left:14px;right:14px;bottom:14px;z-index:2;display:flex;flex-direction:column;gap:4px}
+    .heroImageCaption strong{font-size:14px}
+    .heroImageCaption span{font-size:12px;color:rgba(234,240,255,.75);line-height:1.35}
+
+    .miniServices{display:grid;gap:10px}
+    .miniService{border-radius:18px;padding:12px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.045);display:flex;gap:12px;align-items:flex-start}
+    .miniIcon{width:38px;height:38px;border-radius:14px;display:grid;place-items:center;background:rgba(51,188,230,.12);border:1px solid rgba(51,188,230,.22);flex:0 0 auto}
+    .miniService strong{display:block;font-size:14px}
+    .miniService span{display:block;font-size:12.8px;color:rgba(234,240,255,.72);line-height:1.5;margin-top:4px}
+
+    .sectionHead{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:18px}
+    .sectionHead h2{margin:0;font-size:28px;letter-spacing:-.6px}
+    .sectionHead p{margin:0;color:var(--muted);max-width:74ch;line-height:1.7;font-size:14px}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .servicesGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:16px}
+
+    .card{border-radius:var(--r28);border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);box-shadow:var(--shadow2);padding:22px;position:relative;overflow:hidden}
+    .card::after{content:"";position:absolute;width:320px;height:320px;right:-160px;top:-160px;background:radial-gradient(circle at 30% 30%, rgba(51,188,230,.18), transparent 65%);opacity:.9;pointer-events:none}
+    .card h3{margin:0 0 10px;font-size:16px;position:relative}
+    .card p{margin:0;color:rgba(234,240,255,.74);line-height:1.75;font-size:14px;position:relative}
+
+    /* Blog */
+    .newsToolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin:14px 0 18px}
+    .newsControls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;width:100%}
+    .input{flex:1 1 260px;display:flex;gap:10px;align-items:center;padding:12px;border-radius:18px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.045);box-shadow:var(--shadow2);min-width:240px}
+    .input input{width:100%;border:0;outline:0;background:transparent;color:rgba(234,240,255,.92);font-size:14px;font-family:inherit}
+    .select{padding:12px;border-radius:18px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.045);color:rgba(234,240,255,.88);font-weight:700;font-family:inherit;box-shadow:var(--shadow2);outline:none}
+    .newsGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:10px}
+    .newsCard{border-radius:26px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);box-shadow:var(--shadow2);overflow:hidden;display:flex;flex-direction:column;transition:.22s ease;min-height:320px}
+    .newsCard:hover{transform:translateY(-2px)}
+    .newsThumb{height:150px;position:relative}
+    .newsThumb img{width:100%;height:100%;object-fit:cover;object-position:50% 35%;transform:scale(1.03);filter:saturate(1.04) contrast(1.05)}
+    .newsThumb::after{content:"";position:absolute;inset:0;background:
+      radial-gradient(700px 240px at 20% 0%, rgba(51,188,230,.18), transparent 70%),
+      linear-gradient(to top, rgba(5,8,22,.78), rgba(5,8,22,.08) 60%)}
+    .newsBody{padding:16px;display:flex;flex-direction:column;gap:10px;flex:1 1 auto}
+    .metaRow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;color:rgba(234,240,255,.70);font-size:12px;font-weight:700}
+    .tag{display:inline-flex;align-items:center;gap:8px;padding:7px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.04);font-size:12px;font-weight:800}
+    .newsTitle{font-weight:900;line-height:1.2;margin:0;font-size:15px}
+    .newsExcerpt{color:rgba(234,240,255,.74);font-size:13.5px;line-height:1.65;margin:0;flex:1 1 auto}
+    .newsActions{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:6px}
+    .linkBtn{display:inline-flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.04);font-weight:900;font-size:13px;cursor:pointer}
+    .linkBtn:hover{background:rgba(255,255,255,.07)}
+
+    /* Modal */
+    .modalOverlay{position:fixed;inset:0;background:rgba(0,0,0,.62);opacity:0;pointer-events:none;transition:.2s ease;z-index:300;padding:18px;display:grid;place-items:center}
+    .modal{width:min(860px,100%);max-height:min(80vh,720px);overflow:auto;border-radius:28px;border:1px solid rgba(255,255,255,.12);background:rgba(7,12,31,.88);backdrop-filter:blur(18px);box-shadow:var(--shadow)}
+    .modalHead{padding:16px 18px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+    .modalHead h3{margin:0;font-size:16px;line-height:1.25}
+    .close{width:44px;height:44px;border-radius:14px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:rgba(234,240,255,.95);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto}
+    .modalBody{padding:18px;color:rgba(234,240,255,.78);line-height:1.8;font-size:14px}
+    body.modalOpen .modalOverlay{opacity:1;pointer-events:auto}
+
+    /* Contact CTA */
+    .ctaBand{border-radius:30px;border:1px solid rgba(51,188,230,.25);background:linear-gradient(135deg, rgba(51,188,230,.20), rgba(47,224,200,.10));
+      box-shadow:var(--shadow);padding:26px;display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center}
+    .ctaBand .ctaText h3{margin:0;font-size:18px}
+    .ctaBand .ctaText p{margin:6px 0 0;color:rgba(234,240,255,.78);line-height:1.6;font-size:14px}
+    .ctaBand .ctaActions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+
+    footer{padding:28px 0 34px;border-top:1px solid rgba(255,255,255,.08);color:rgba(234,240,255,.70)}
+    .footerGrid{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+    .pill{display:inline-flex;align-items:center;gap:10px;padding:10px 12px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.10);font-size:13px}
+
+    .reveal{opacity:0;transform:translateY(10px);transition:.7s ease}
+    .reveal.show{opacity:1;transform:translateY(0)}
+
+    /* WhatsApp fixed with SVG icon */
+    .waFloat{
+      position:fixed; right:18px; bottom:18px; z-index:260;
+      display:flex; align-items:center; gap:10px;
+      padding:12px 14px; border-radius:999px;
+      background:rgba(37,211,102,.16); border:1px solid rgba(37,211,102,.40);
+      box-shadow:0 18px 50px rgba(0,0,0,.45); backdrop-filter:blur(10px);
+      transition:.2s ease; user-select:none;
+    }
+    .waFloat:hover{transform:translateY(-2px); background:rgba(37,211,102,.22)}
+    .waIcon{
+      width:44px;height:44px;border-radius:16px;display:grid;place-items:center;
+      background:linear-gradient(135deg, rgba(37,211,102,.95), rgba(47,224,200,.70));
+      border:1px solid rgba(37,211,102,.45);
+    }
+    .waIcon svg{width:24px;height:24px;display:block}
+    .waText{display:flex;flex-direction:column;line-height:1.1}
+    .waText strong{font-size:13px}
+    .waText span{font-size:12px;color:rgba(234,240,255,.75);margin-top:3px}
+    @media (max-width:520px){ .waText{display:none} .waFloat{padding:10px} }
+
+    @media (max-width:1120px){ .newsGrid{grid-template-columns:1fr 1fr} }
+    @media (max-width:980px){ .heroGrid{grid-template-columns:1fr} .grid2{grid-template-columns:1fr} .servicesGrid{grid-template-columns:1fr} }
+    @media (max-width:860px){ nav.desktop{display:none} .navActions .btn{display:none} .iconBtn{display:inline-flex} }
+    @media (max-width:680px){
+      .newsGrid{grid-template-columns:1fr}
+      .ctaBand{grid-template-columns:1fr;align-items:start}
+      .ctaBand .ctaActions{justify-content:stretch}
+      .ctaBand .ctaActions a{width:100%}
+    }
+  </style>
+</head>
+
+<body>
+  <div class="texture" aria-hidden="true"></div>
+
+  <header>
+    <div class="container">
+      <div class="nav">
+        <a class="brand" href="#top" aria-label="Rich Corporation">
+          <div class="brandLogo">
+            <img src="assets/logo-rich.png" alt="Rich Corporation"
+                 onerror="this.style.display='none'; this.parentElement.style.background='linear-gradient(135deg, rgba(51,188,230,.95), rgba(47,224,200,.75))'; this.parentElement.innerHTML='<span style=&quot;font-weight:900;color:#04142C&quot;>RC</span>';">
+          </div>
+          <div class="brandText">
+            <strong>RICH CORPORATION</strong>
+            <span id="brandSub">Accompagnement étudiants — Afrique du Sud</span>
+          </div>
+        </a>
+
+        <nav class="desktop" aria-label="Navigation">
+          <a href="#about" data-spy="about" id="navAbout">À propos</a>
+          <a href="#services" data-spy="services" id="navServices">Services</a>
+          <a href="#news" data-spy="news" id="navNews">Actualités</a>
+          <a href="#contact" data-spy="contact" id="navContact">Contact</a>
+        </nav>
+
+        <div class="navActions">
+          <button class="btn small" id="langToggle" type="button">FR</button>
+          <a class="btn" href="tel:+27633605203" id="callBtn">Appeler</a>
+          <a class="btn primary" href="#contact" id="ctaBtn">Demander un accompagnement</a>
+          <button class="iconBtn" id="openDrawer" aria-label="Ouvrir le menu">☰</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="drawerOverlay" id="drawerOverlay" aria-hidden="true"></div>
+  <aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-label="Menu mobile">
+    <div class="drawerHead">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="brandLogo" style="width:40px;height:40px;"><img src="assets/logo-rich.png" alt="Rich Corporation"></div>
+        <div style="line-height:1.1">
+          <div style="font-weight:900;letter-spacing:.6px;font-size:12px;text-transform:uppercase;">Rich Corporation</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px;" id="drawerSub">Menu</div>
+        </div>
+      </div>
+      <button class="iconBtn" id="closeDrawer" aria-label="Fermer" style="display:inline-flex;">✕</button>
+    </div>
+    <div class="drawerNav">
+      <a href="#about" id="dAbout">À propos</a>
+      <a href="#services" id="dServices">Services</a>
+      <a href="#news" id="dNews">Actualités</a>
+      <a href="#contact" id="dContact">Contact</a>
+      <button class="btn small" id="langToggle2" type="button" style="margin-top:12px; width:100%; justify-content:center;">FR</button>
+      <a class="btn primary" href="tel:+27633605203" style="margin-top:10px;justify-content:center;">📞 +27 63 360 5203</a>
+      <a class="btn" href="https://www.richcorporation.co.za" target="_blank" rel="noopener" style="justify-content:center;">🌐 richcorporation.co.za</a>
+    </div>
+  </aside>
+
+  <div class="modalOverlay" id="modalOverlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-label="Article">
+      <div class="modalHead">
+        <div>
+          <h3 id="modalTitle">Titre</h3>
+          <div id="modalMeta" class="metaRow" style="margin-top:8px;"></div>
+        </div>
+        <button class="close" id="modalClose" aria-label="Fermer">✕</button>
+      </div>
+      <div class="modalBody" id="modalBody"></div>
+    </div>
+  </div>
+
+  <main id="top">
+    <section class="hero">
+      <div class="container">
+        <div class="heroGrid">
+          <div class="heroCard reveal">
+            <div class="heroLeft">
+              <div class="kicker"><span class="dot"></span><span id="kicker">De Nous vers Vous</span></div>
+              <h1 id="heroTitle">nous <span class="gradient">vous facilitons</span> votre vie</h1>
+              <p class="lead" id="heroLead">
+                Étudiez en toute sérénité en nous confiant la gestion de votre logement,
+                de vos inscriptions scolaires et de vos démarches d'immigration.
+              </p>
+              <div class="heroBtns">
+                <a class="btn primary" href="#contact" id="heroStart">Commencer maintenant</a>
+                <a class="btn" href="#news" id="heroNews">Voir les actualités</a>
+              </div>
+              <div class="badges">
+                <div class="badge" id="b1">✅ Dossiers conformes</div>
+                <div class="badge" id="b2">🛂 Visa / Immigration</div>
+                <div class="badge" id="b3">🏠 Logement sécurisé</div>
+                <div class="badge" id="b4">📝 Support francophone</div>
+              </div>
+            </div>
+          </div>
+
+          <aside class="heroCard reveal">
+            <div class="heroRight">
+              <div class="imageFrame heroImage">
+                <img src="assets/hero.jpg" alt="Étudier en Afrique du Sud">
+                <div class="heroImageCaption">
+                  <strong id="heroCap1">Accompagnement premium</strong>
+                  <span id="heroCap2">Admissions • Hébergement • Immigration • Assurance</span>
+                </div>
+              </div>
+
+              <div class="miniServices">
+                <div class="miniService"><div class="miniIcon">🎓</div><div><strong id="ms1t">Inscriptions</strong><span id="ms1d">Orientation + dossier complet.</span></div></div>
+                <div class="miniService"><div class="miniIcon">🏠</div><div><strong id="ms2t">Hébergement</strong><span id="ms2d">Options accréditées & proches campus.</span></div></div>
+                <div class="miniService"><div class="miniIcon">🛂</div><div><strong id="ms3t">Visa / VFS</strong><span id="ms3d">Checklist + conformité documents.</span></div></div>
+                <div class="miniService"><div class="miniIcon">🩺</div><div><strong id="ms4t">Assurance</strong><span id="ms4d">Couvertures adaptées immigration.</span></div></div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section id="about">
+      <div class="container">
+        <div class="sectionHead reveal">
+          <div>
+            <h2 id="aboutTitle">Qui sommes-nous ?</h2>
+            <p id="aboutDesc">Entreprise panafricaine dédiée à l’accompagnement des étudiants vers la réussite en Afrique du Sud.</p>
+          </div>
+        </div>
+        <div class="grid2">
+          <div class="card reveal">
+            <h3 id="aboutMissionT">Notre mission</h3>
+            <p id="aboutMissionP">
+              Nous accompagnons les étudiants de l'inscription scolaire au logement, en passant par le renouvellement des visas
+              et le soutien en français.
+            </p>
+          </div>
+          <div class="imageFrame reveal" style="min-height:300px">
+            <img src="assets/about.jpg" alt="Rich Corporation" style="object-position:50% 30%">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="services">
+      <div class="container">
+        <div class="sectionHead reveal">
+          <div>
+            <h2 id="svcTitle">Services</h2>
+            <p id="svcDesc">Admissions, logement, immigration, assurance — un accompagnement sur mesure.</p>
+          </div>
+        </div>
+        <div class="servicesGrid">
+          <article class="card reveal"><h3 id="s1t">Inscriptions Scolaires</h3><p id="s1d">Orientation + gestion complète du dossier d’admission.</p></article>
+          <article class="card reveal"><h3 id="s2t">Hébergement Étudiant</h3><p id="s2d">Logements sécurisés et accrédités, proches du campus.</p></article>
+          <article class="card reveal"><h3 id="s3t">Visas & Immigration</h3><p id="s3d">Dossier VFS Global : conformité totale + préparation rendez-vous.</p></article>
+          <article class="card reveal"><h3 id="s4t">Assurance Médicale</h3><p id="s4d">Assistance pour choisir une couverture adaptée.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section id="news">
+      <div class="container">
+        <div class="sectionHead reveal">
+          <div>
+            <h2 id="newsTitle">Actualités & Dates importantes</h2>
+            <p id="newsDesc">Publiez ici les dates d’inscriptions, deadlines, mises à jour visa, etc. (chargé depuis Django).</p>
+          </div>
+        </div>
+
+        <div class="newsToolbar reveal">
+          <div class="newsControls">
+            <div class="input">🔎 <input id="newsSearch" placeholder="Rechercher…" /></div>
+            <select class="select" id="newsFilter">
+              <option value="all" id="fAll">Tous</option>
+              <option value="university" id="fUni">Université</option>
+              <option value="visa" id="fVisa">Visa</option>
+              <option value="housing" id="fHouse">Logement</option>
+              <option value="insurance" id="fIns">Assurance</option>
+            </select>
+            <button class="btn" id="newsReset" type="button">Réinitialiser</button>
+          </div>
+        </div>
+
+        <div class="newsGrid" id="newsGrid"></div>
+      </div>
+    </section>
+
+    <section id="contact">
+      <div class="container">
+        <div class="ctaBand reveal">
+          <div class="ctaText">
+            <h3 id="contactT">Prêt(e) à démarrer votre parcours en Afrique du Sud ?</h3>
+            <p id="contactP">Contactez Rich Corporation pour un accompagnement fiable et premium.</p>
+          </div>
+          <div class="ctaActions">
+            <a class="btn primary" href="tel:+27633605203">📞 +27 63 360 5203</a>
+            <a class="btn" href="https://www.richcorporation.co.za" target="_blank" rel="noopener">🌐 www.richcorporation.co.za</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <div class="container">
+        <div class="footerGrid">
+          <div class="pill">📞 <span>+27 63 360 5203</span></div>
+          <div class="pill">🌐 <span>www.richcorporation.co.za</span></div>
+          <div class="pill">© <span id="year"></span> Rich Corporation</div>
+        </div>
+      </div>
+    </footer>
+  </main>
+
+  <!-- WhatsApp Floating -->
+  <a class="waFloat"
+     href="https://wa.me/27633605203?text=Bonjour%20Rich%20Corporation%2C%20j%27aimerais%20des%20infos%20sur%20les%20inscriptions%20et%20le%20visa."
+     target="_blank" rel="noopener" aria-label="WhatsApp">
+    <div class="waIcon" aria-hidden="true">
+      <!-- WhatsApp SVG -->
+      <svg viewBox="0 0 32 32" fill="none">
+        <path fill="#071015" d="M16 2.6C8.54 2.6 2.5 8.64 2.5 16.1c0 2.37.62 4.69 1.8 6.74L3 29.4l6.74-1.76a13.46 13.46 0 0 0 6.26 1.55h.01c7.46 0 13.5-6.04 13.5-13.5S23.46 2.6 16 2.6Z"/>
+        <path fill="#071015" d="M16 5.2c6.03 0 10.9 4.87 10.9 10.9S22.03 27 16 27c-1.97 0-3.89-.53-5.57-1.54l-.39-.23-3.99 1.04 1.06-3.9-.25-.4A10.85 10.85 0 0 1 5.1 16.1C5.1 10.07 9.97 5.2 16 5.2Z"/>
+        <path fill="#EAF0FF" d="M21.85 18.86c-.31-.16-1.86-.92-2.15-1.02-.29-.11-.5-.16-.71.16-.21.31-.82 1.02-1 1.23-.18.21-.36.23-.67.08-.31-.16-1.31-.48-2.49-1.54-.92-.82-1.54-1.83-1.72-2.14-.18-.31-.02-.48.13-.63.14-.14.31-.36.47-.54.16-.18.21-.31.31-.52.1-.21.05-.39-.03-.54-.08-.16-.71-1.71-.98-2.34-.26-.62-.53-.53-.71-.54h-.6c-.21 0-.54.08-.82.39-.29.31-1.08 1.06-1.08 2.58 0 1.52 1.11 2.99 1.26 3.2.16.21 2.19 3.35 5.3 4.69.74.32 1.32.52 1.77.66.74.24 1.41.2 1.94.12.59-.09 1.86-.76 2.12-1.49.26-.73.26-1.36.18-1.49-.08-.13-.29-.21-.6-.36Z"/>
+      </svg>
+    </div>
+    <div class="waText">
+      <strong>WhatsApp</strong>
+      <span id="waSub">Réponse rapide</span>
+    </div>
+  </a>
+
+  <script>
+    // ===== CONFIG =====
+    const API_BASE = "http://127.0.0.1:8000"; // <-- mets ton backend (prod) ici
+
+    // ===== YEAR =====
+    document.getElementById("year").textContent = new Date().getFullYear();
+
+    // ===== Drawer =====
+    const openBtn = document.getElementById("openDrawer");
+    const closeBtn = document.getElementById("closeDrawer");
+    const overlay = document.getElementById("drawerOverlay");
+    const drawer = document.getElementById("drawer");
+    function openDrawer(){ document.body.classList.add("drawerOpen"); overlay.setAttribute("aria-hidden","false"); setTimeout(()=>closeBtn?.focus(), 50); }
+    function closeDrawer(){ document.body.classList.remove("drawerOpen"); overlay.setAttribute("aria-hidden","true"); openBtn?.focus(); }
+    openBtn?.addEventListener("click", openDrawer);
+    closeBtn?.addEventListener("click", closeDrawer);
+    overlay?.addEventListener("click", closeDrawer);
+    drawer?.querySelectorAll("a").forEach(a => a.addEventListener("click", closeDrawer));
+    document.addEventListener("keydown", (e)=>{ if(e.key==="Escape" && document.body.classList.contains("drawerOpen")) closeDrawer(); });
+
+    // ===== Reveal =====
+    const els = Array.from(document.querySelectorAll(".reveal"));
+    const io = new IntersectionObserver((entries)=>{ entries.forEach(e=>{ if(e.isIntersecting) e.target.classList.add("show"); });},{threshold:0.12});
+    els.forEach(el=>io.observe(el));
+
+    // ===== Scrollspy =====
+    const spyLinks = Array.from(document.querySelectorAll('nav.desktop a[data-spy]'));
+    const sections = spyLinks.map(a => document.getElementById(a.dataset.spy)).filter(Boolean);
+    const spy = new IntersectionObserver((entries)=>{ entries.forEach(entry=>{ if(!entry.isIntersecting) return;
+      const id=entry.target.id; spyLinks.forEach(a=>a.classList.toggle("active", a.dataset.spy===id));
+    }); }, { rootMargin:"-45% 0px -45% 0px", threshold:0 });
+    sections.forEach(s=>spy.observe(s));
+
+    // ===== Modal =====
+    const modalOverlay = document.getElementById("modalOverlay");
+    const modalClose = document.getElementById("modalClose");
+    const modalTitle = document.getElementById("modalTitle");
+    const modalMeta = document.getElementById("modalMeta");
+    const modalBody = document.getElementById("modalBody");
+    function openModal(){ document.body.classList.add("modalOpen"); modalOverlay.setAttribute("aria-hidden","false"); setTimeout(()=>modalClose?.focus(),50); }
+    function closeModal(){ document.body.classList.remove("modalOpen"); modalOverlay.setAttribute("aria-hidden","true"); }
+    modalClose?.addEventListener("click", closeModal);
+    modalOverlay?.addEventListener("click", (e)=>{ if(e.target===modalOverlay) closeModal(); });
+    document.addEventListener("keydown", (e)=>{ if(e.key==="Escape" && document.body.classList.contains("modalOpen")) closeModal(); });
+
+    function fmtDate(iso){
+      const dt = new Date(iso);
+      if (Number.isNaN(dt.getTime())) return iso;
+      return dt.toLocaleDateString(lang==="fr" ? "fr-FR" : "en-US", {year:"numeric", month:"long", day:"numeric"});
+    }
+
+    // ===== i18n (UI text) =====
+    const UI = {
+      fr: {
+        brandSub:"Accompagnement étudiants — Afrique du Sud",
+        drawerSub:"Menu",
+        nav:{about:"À propos", services:"Services", news:"Actualités", contact:"Contact"},
+        hero:{
+          kicker:"De Nous vers Vous",
+          title:'nous <span class="gradient">vous facilitons</span> votre vie',
+          lead:"Étudiez en toute sérénité en nous confiant la gestion de votre logement, de vos inscriptions scolaires et de vos démarches d'immigration.",
+          start:"Commencer maintenant",
+          news:"Voir les actualités",
+          badges:["✅ Dossiers conformes","🛂 Visa / Immigration","🏠 Logement sécurisé","📝 Support francophone"],
+          cap1:"Accompagnement premium",
+          cap2:"Admissions • Hébergement • Immigration • Assurance",
+          mini:[
+            ["Inscriptions","Orientation + dossier complet."],
+            ["Hébergement","Options accréditées & proches campus."],
+            ["Visa / VFS","Checklist + conformité documents."],
+            ["Assurance","Couvertures adaptées immigration."]
+          ]
+        },
+        about:{title:"Qui sommes-nous ?", desc:"Entreprise panafricaine dédiée à l’accompagnement des étudiants vers la réussite en Afrique du Sud.", mT:"Notre mission", mP:"Nous accompagnons les étudiants de l'inscription scolaire au logement, en passant par le renouvellement des visas et le soutien en français."},
+        services:{title:"Services", desc:"Admissions, logement, immigration, assurance — un accompagnement sur mesure.",
+          items:[
+            ["Inscriptions Scolaires","Orientation + gestion complète du dossier d’admission."],
+            ["Hébergement Étudiant","Logements sécurisés et accrédités, proches du campus."],
+            ["Visas & Immigration","Dossier VFS Global : conformité totale + préparation rendez-vous."],
+            ["Assurance Médicale","Assistance pour choisir une couverture adaptée."]
+          ]},
+        news:{title:"Actualités & Dates importantes", desc:"Publiez ici les dates d’inscriptions, deadlines, mises à jour visa, etc. (chargé depuis Django).",
+          search:"Rechercher…", reset:"Réinitialiser", filters:{all:"Tous", university:"Université", visa:"Visa", housing:"Logement", insurance:"Assurance"}, read:"Lire"},
+        contact:{t:"Prêt(e) à démarrer votre parcours en Afrique du Sud ?", p:"Contactez Rich Corporation pour un accompagnement fiable et premium."},
+        waSub:"Réponse rapide",
+        call:"Appeler",
+        cta:"Demander un accompagnement",
+      },
+      en: {
+        brandSub:"Student support — South Africa",
+        drawerSub:"Menu",
+        nav:{about:"About", services:"Services", news:"News", contact:"Contact"},
+        hero:{
+          kicker:"From Us to You",
+          title:'we <span class="gradient">make your life</span> easier',
+          lead:"Study with peace of mind. We help with housing, school enrollment, and immigration steps in South Africa.",
+          start:"Get started",
+          news:"See updates",
+          badges:["✅ Complete & compliant files","🛂 Visa / Immigration","🏠 Safe housing","📝 French support"],
+          cap1:"Premium assistance",
+          cap2:"Admissions • Housing • Immigration • Insurance",
+          mini:[
+            ["Enrollment","Guidance + complete file."],
+            ["Housing","Accredited options near campus."],
+            ["Visa / VFS","Checklist + compliance check."],
+            ["Insurance","Coverage aligned with requirements."]
+          ]
+        },
+        about:{title:"Who are we?", desc:"A pan-African company dedicated to helping students succeed in South Africa.", mT:"Our mission", mP:"We support students from enrollment to housing, visas, and French-language assistance."},
+        services:{title:"Services", desc:"Admissions, housing, immigration, insurance — tailored support.",
+          items:[
+            ["School Enrollment","Guidance + full admission file support."],
+            ["Student Housing","Safe and accredited housing near campus."],
+            ["Visas & Immigration","VFS file compliance + appointment preparation."],
+            ["Medical Insurance","Help choosing compliant coverage."]
+          ]},
+        news:{title:"News & Key Dates", desc:"Publish enrollment dates, deadlines, visa updates, and real changes (loaded from Django).",
+          search:"Search…", reset:"Reset", filters:{all:"All", university:"University", visa:"Visa", housing:"Housing", insurance:"Insurance"}, read:"Read"},
+        contact:{t:"Ready to start your journey in South Africa?", p:"Contact Rich Corporation for reliable, premium support."},
+        waSub:"Fast reply",
+        call:"Call",
+        cta:"Request support",
+      }
+    };
+
+    let lang = localStorage.getItem("lang") || "fr";
+    const langToggle = document.getElementById("langToggle");
+    const langToggle2 = document.getElementById("langToggle2");
+
+    function applyLang(){
+      document.documentElement.lang = lang;
+      const t = UI[lang];
+
+      document.getElementById("brandSub").textContent = t.brandSub;
+      document.getElementById("drawerSub").textContent = t.drawerSub;
+
+      document.getElementById("navAbout").textContent = t.nav.about;
+      document.getElementById("navServices").textContent = t.nav.services;
+      document.getElementById("navNews").textContent = t.nav.news;
+      document.getElementById("navContact").textContent = t.nav.contact;
+
+      document.getElementById("dAbout").textContent = t.nav.about;
+      document.getElementById("dServices").textContent = t.nav.services;
+      document.getElementById("dNews").textContent = t.nav.news;
+      document.getElementById("dContact").textContent = t.nav.contact;
+
+      document.getElementById("kicker").textContent = t.hero.kicker;
+      document.getElementById("heroTitle").innerHTML = t.hero.title;
+      document.getElementById("heroLead").textContent = t.hero.lead;
+      document.getElementById("heroStart").textContent = t.hero.start;
+      document.getElementById("heroNews").textContent = t.hero.news;
+
+      document.getElementById("b1").textContent = t.hero.badges[0];
+      document.getElementById("b2").textContent = t.hero.badges[1];
+      document.getElementById("b3").textContent = t.hero.badges[2];
+      document.getElementById("b4").textContent = t.hero.badges[3];
+
+      document.getElementById("heroCap1").textContent = t.hero.cap1;
+      document.getElementById("heroCap2").textContent = t.hero.cap2;
+
+      document.getElementById("ms1t").textContent = t.hero.mini[0][0];
+      document.getElementById("ms1d").textContent = t.hero.mini[0][1];
+      document.getElementById("ms2t").textContent = t.hero.mini[1][0];
+      document.getElementById("ms2d").textContent = t.hero.mini[1][1];
+      document.getElementById("ms3t").textContent = t.hero.mini[2][0];
+      document.getElementById("ms3d").textContent = t.hero.mini[2][1];
+      document.getElementById("ms4t").textContent = t.hero.mini[3][0];
+      document.getElementById("ms4d").textContent = t.hero.mini[3][1];
+
+      document.getElementById("aboutTitle").textContent = t.about.title;
+      document.getElementById("aboutDesc").textContent = t.about.desc;
+      document.getElementById("aboutMissionT").textContent = t.about.mT;
+      document.getElementById("aboutMissionP").textContent = t.about.mP;
+
+      document.getElementById("svcTitle").textContent = t.services.title;
+      document.getElementById("svcDesc").textContent = t.services.desc;
+      document.getElementById("s1t").textContent = t.services.items[0][0];
+      document.getElementById("s1d").textContent = t.services.items[0][1];
+      document.getElementById("s2t").textContent = t.services.items[1][0];
+      document.getElementById("s2d").textContent = t.services.items[1][1];
+      document.getElementById("s3t").textContent = t.services.items[2][0];
+      document.getElementById("s3d").textContent = t.services.items[2][1];
+      document.getElementById("s4t").textContent = t.services.items[3][0];
+      document.getElementById("s4d").textContent = t.services.items[3][1];
+
+      document.getElementById("newsTitle").textContent = t.news.title;
+      document.getElementById("newsDesc").textContent = t.news.desc;
+      document.getElementById("newsSearch").placeholder = t.news.search;
+      document.getElementById("newsReset").textContent = t.news.reset;
+      document.getElementById("fAll").textContent = t.news.filters.all;
+      document.getElementById("fUni").textContent = t.news.filters.university;
+      document.getElementById("fVisa").textContent = t.news.filters.visa;
+      document.getElementById("fHouse").textContent = t.news.filters.housing;
+      document.getElementById("fIns").textContent = t.news.filters.insurance;
+
+      document.getElementById("contactT").textContent = t.contact.t;
+      document.getElementById("contactP").textContent = t.contact.p;
+
+      document.getElementById("waSub").textContent = t.waSub;
+      document.getElementById("callBtn").textContent = t.call;
+      document.getElementById("ctaBtn").textContent = t.cta;
+
+      langToggle.textContent = lang.toUpperCase();
+      langToggle2.textContent = lang.toUpperCase();
+
+      fetchPosts(); // reload posts with new language
+    }
+
+    function toggleLang(){
+      lang = (lang === "fr") ? "en" : "fr";
+      localStorage.setItem("lang", lang);
+      applyLang();
+    }
+    langToggle.addEventListener("click", toggleLang);
+    langToggle2.addEventListener("click", toggleLang);
+
+    // ===== BLOG FROM DJANGO API =====
+    const newsGrid = document.getElementById("newsGrid");
+    const newsSearch = document.getElementById("newsSearch");
+    const newsFilter = document.getElementById("newsFilter");
+    const newsReset = document.getElementById("newsReset");
+
+    let POSTS = [];
+
+    async function fetchPosts(){
+      try{
+        // API: /api/posts/?lang=fr
+        const url = `${API_BASE}/api/posts/?lang=${encodeURIComponent(lang)}`;
+        const res = await fetch(url, { headers: { "Accept":"application/json" } });
+        if(!res.ok) throw new Error("API error");
+        POSTS = await res.json();
+        renderPosts();
+      }catch(e){
+        // fallback if API is offline
+        POSTS = [];
+        newsGrid.innerHTML = `<div class="card" style="grid-column: 1 / -1;">
+          <h3>Blog API indisponible</h3>
+          <p>Le backend n'est pas encore connecté. Dès que l'API est en ligne, les articles s'afficheront ici automatiquement.</p>
+        </div>`;
+      }
+    }
+
+    function renderPosts(){
+      const q = (newsSearch.value || "").trim().toLowerCase();
+      const cat = newsFilter.value;
+
+      const filtered = POSTS
+        .filter(p => (cat === "all" ? true : p.category === cat))
+        .filter(p => {
+          if (!q) return true;
+          const hay = (p.title + " " + (p.excerpt||"") + " " + (p.category||"")).toLowerCase();
+          return hay.includes(q);
+        })
+        .sort((a,b) => (a.published_at < b.published_at ? 1 : -1));
+
+      const t = UI[lang];
+
+      if(filtered.length === 0){
+        newsGrid.innerHTML = `<div class="card" style="grid-column: 1 / -1;">
+          <h3>${lang==="fr" ? "Aucun article" : "No posts"}</h3>
+          <p>${lang==="fr" ? "Aucune actualité ne correspond à votre recherche." : "No updates match your search."}</p>
+        </div>`;
+        return;
+      }
+
+      newsGrid.innerHTML = filtered.map(p => `
+        <article class="newsCard">
+          <div class="newsThumb">
+            <img src="${p.cover_image || "https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=1800&q=80"}" alt="${escapeHtml(p.title)}">
+          </div>
+          <div class="newsBody">
+            <div class="metaRow">
+              <span class="tag">${mapCategoryLabel(p.category)}</span>
+              <span>•</span>
+              <span>${fmtDate(p.published_at)}</span>
+            </div>
+            <h3 class="newsTitle">${escapeHtml(p.title)}</h3>
+            <p class="newsExcerpt">${escapeHtml(p.excerpt || "")}</p>
+            <div class="newsActions">
+              <button class="linkBtn" type="button" data-open="${p.slug}">${t.news.read}</button>
+              <span style="color: rgba(234,240,255,.62); font-size:12px; font-weight:800;">${lang==="fr" ? "Mise à jour" : "Updated"}</span>
+            </div>
+          </div>
+        </article>
+      `).join("");
+
+      newsGrid.querySelectorAll("[data-open]").forEach(btn=>{
+        btn.addEventListener("click", ()=>openPost(btn.getAttribute("data-open")));
+      });
+    }
+
+    function mapCategoryLabel(cat){
+      const t = UI[lang].news.filters;
+      if(cat==="university") return t.university;
+      if(cat==="visa") return t.visa;
+      if(cat==="housing") return t.housing;
+      if(cat==="insurance") return t.insurance;
+      return cat || "";
+    }
+
+    async function openPost(slug){
+      try{
+        const url = `${API_BASE}/api/posts/${encodeURIComponent(slug)}/?lang=${encodeURIComponent(lang)}`;
+        const res = await fetch(url, { headers: { "Accept":"application/json" } });
+        if(!res.ok) throw new Error("API error");
+        const p = await res.json();
+        modalTitle.textContent = p.title;
+        modalMeta.innerHTML = `<span class="tag">${mapCategoryLabel(p.category)}</span><span>•</span><span>${fmtDate(p.published_at)}</span>`;
+        modalBody.innerHTML = p.content_html || escapeHtml(p.content || "");
+        openModal();
+      }catch(e){
+        modalTitle.textContent = (lang==="fr") ? "Erreur" : "Error";
+        modalMeta.innerHTML = "";
+        modalBody.textContent = (lang==="fr") ? "Impossible de charger l'article." : "Unable to load the post.";
+        openModal();
+      }
+    }
+
+    newsSearch.addEventListener("input", renderPosts);
+    newsFilter.addEventListener("change", renderPosts);
+    newsReset.addEventListener("click", ()=>{ newsSearch.value=""; newsFilter.value="all"; renderPosts(); });
+
+    function escapeHtml(s){
+      return String(s || "").replace(/[&<>"']/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[m]));
+    }
+
+    applyLang(); // also calls fetchPosts()
+  </script>
+</body>
+</html>

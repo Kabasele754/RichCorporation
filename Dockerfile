@@ -1,0 +1,50 @@
+FROM python:3.9-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    DEBIAN_FRONTEND=noninteractive \
+    PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig
+
+# ---- runtime (WeasyPrint + Postgres) ----
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libglib2.0-0 \
+    libcairo2 \
+    libpango-1.0-0 \
+    libpangoft2-1.0-0 \
+    libgdk-pixbuf-2.0-0 \
+    shared-mime-info \
+    libpq-dev \
+    fonts-dejavu-core \
+ && rm -rf /var/lib/apt/lists/*
+
+# ---- build (pour pycairo/WeasyPrint via Meson) ----
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    python3-dev \
+    libffi-dev \
+    pkgconf \
+    pkg-config \
+    libcairo2-dev \
+    libpango1.0-dev \
+    meson \
+    ninja-build \
+ && pkg-config --modversion cairo && pkg-config --modversion pango \
+ && rm -rf /var/lib/apt/lists/*
+
+# pip tooling
+RUN pip install --upgrade pip setuptools wheel
+
+WORKDIR /app
+COPY requirements.txt /app/
+RUN pip install --no-cache-dir -r requirements.txt
+
+# (optionnel) alléger: retirer les build-deps après l’install pip
+RUN apt-get purge -y --auto-remove \
+    build-essential gcc python3-dev libffi-dev \
+    pkgconf pkg-config libcairo2-dev libpango1.0-dev meson ninja-build \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY . /app/
+
+EXPOSE 8000
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]

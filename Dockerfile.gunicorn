@@ -1,0 +1,39 @@
+FROM python:3.9-slim
+
+ENV PYTHONUNBUFFERED=1
+
+# Installer les bibliothèques système nécessaires à WeasyPrint + PostgreSQL
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpango-1.0-0 \
+    libcairo2 \
+    libpangoft2-1.0-0 \
+    libgdk-pixbuf-2.0-0 \
+    libgdk-pixbuf-xlib-2.0-0 \
+    libffi-dev \
+    libglib2.0-0 \
+    shared-mime-info \
+    libpq-dev \
+    gcc \
+    python3-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Définir le répertoire de travail
+WORKDIR /app
+
+# Copier les dépendances
+COPY requirements.txt /app/
+
+# Mettre à jour pip et installer les dépendances Python
+RUN pip install --upgrade pip setuptools wheel
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copier le reste du projet
+COPY . /app/
+
+# Exposer le port sur lequel Gunicorn sera disponible
+EXPOSE 8000
+
+# Commande pour lancer Gunicorn (remplace 'parameter' par le nom réel de ton projet si différent)
+CMD ["gunicorn", "richcorp.wsgi:application", "--bind", "0.0.0.0:8000"]

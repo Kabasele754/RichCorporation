@@ -22,9 +22,7 @@ CSP_HEADER = {
     
 }
 
-
 import os
-from pathlib import Path
 
 def read_secret(path, default=""):
     try:
@@ -33,22 +31,22 @@ def read_secret(path, default=""):
     except Exception:
         return default
 
-DB_PASS = os.environ.get("DB_PASS")
-DB_PASS_FILE = os.environ.get("DB_PASS_FILE")
-
-if not DB_PASS and DB_PASS_FILE:
-    DB_PASS = read_secret(DB_PASS_FILE)
+DB_PASSWORD = os.getenv("DB_PASS")
+DB_PASS_FILE = os.getenv("DB_PASS_FILE")
+if DB_PASS_FILE and not DB_PASSWORD:
+    DB_PASSWORD = read_secret(DB_PASS_FILE)
 
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("DB_NAME", "richcorpdb"),
-        "USER": os.environ.get("DB_USER", "richcorpuser"),
-        "PASSWORD": DB_PASS or "richcorppass",
-        "HOST": os.environ.get("DB_HOST", "db"),
-        "PORT": os.environ.get("DB_PORT", "5432"),
+        "NAME": os.getenv("DB_NAME", "richcorpdb"),
+        "USER": os.getenv("DB_USER", "richcorpuser"),
+        "PASSWORD": DB_PASSWORD or "richcorppass",
+        "HOST": os.getenv("DB_HOST", "db"),
+        "PORT": os.getenv("DB_PORT", "5432"),
     }
 }
+
 
 # DATABASES = {
 #     'default': {

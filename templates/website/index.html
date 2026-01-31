@@ -9,6 +9,34 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="shortcut icon" type="image/x-icon" href="{% static 'assets/logo-rich.png' %}">
+
+
+    <!-- ======================
+       SEO / META (Premium)
+  ======================= -->
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+  <meta name="googlebot" content="index, follow" />
+
+  <!-- Canonical -->
+  <link rel="canonical" href="https://www.richcorporation.co.za/" />
+
+  <!-- Keywords (optionnel) -->
+  <meta name="keywords" content="Étudier en Afrique du Sud, inscription université Afrique du Sud, visa étudiant, VFS Global, logement étudiant, assurance médicale Afrique du Sud, accompagnement étudiants, Rich Corporation" />
+
+  <!-- Theme color -->
+  <meta name="theme-color" content="#050816" />
+  <meta name="color-scheme" content="dark light" />
+
+  <!-- Favicons -->
+  <link rel="icon" href="{% static 'assets/favicon.ico' %}" sizes="any">
+  <link rel="apple-touch-icon" href="{% static 'assets/logo-rich.png' %}">
+  <link rel="manifest" href="{% static 'assets/site.webmanifest' %}">
+
+  <!-- Preload logo (plus rapide / meilleur LCP) -->
+  <link rel="preload" as="image" href="{% static 'assets/logo-rich.png' %}">
+  <link rel="preload" as="image" href="{% static 'assets/hero.png' %}">
+
 
   <style>
     :root{
@@ -233,11 +261,174 @@
   box-shadow: var(--shadow);
 }
 
+
+/* ======================
+   PREMIUM PAGE LOADER
+====================== */
+.loaderWrap{
+  position:fixed; inset:0; z-index:9999;
+  display:grid; place-items:center;
+  background:
+    radial-gradient(1000px 600px at 15% 15%, rgba(51,188,230,.22), transparent 60%),
+    radial-gradient(900px 600px at 85% 25%, rgba(47,224,200,.16), transparent 60%),
+    linear-gradient(180deg, rgba(5,8,22,.98), rgba(7,12,31,.95));
+  backdrop-filter: blur(12px);
+  transition: opacity .45s ease, transform .45s ease;
+}
+
+.loaderWrap.hide{
+  opacity:0;
+  pointer-events:none;
+  transform: translateY(-8px);
+}
+
+.loaderGlow{
+  position:absolute; inset:-40px;
+  background:
+    radial-gradient(700px 360px at 50% 45%, rgba(51,188,230,.16), transparent 65%),
+    radial-gradient(600px 300px at 55% 55%, rgba(47,224,200,.12), transparent 65%);
+  filter: blur(12px);
+  opacity:.95;
+}
+
+.loaderCard{
+  width:min(560px, calc(100% - 40px));
+  border-radius: 28px;
+  border:1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.05);
+  box-shadow: 0 30px 120px rgba(0,0,0,.70);
+  padding: 22px;
+  position:relative;
+  overflow:hidden;
+}
+
+.loaderCard::after{
+  content:"";
+  position:absolute; width:420px; height:420px;
+  right:-210px; top:-240px;
+  background: radial-gradient(circle at 30% 30%, rgba(51,188,230,.22), transparent 68%);
+  pointer-events:none;
+}
+
+.loaderBrand{
+  display:flex; align-items:center; gap:14px;
+  margin-bottom: 16px;
+}
+
+.loaderLogo{
+  width:58px; height:58px; border-radius:18px;
+  border:1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.06);
+  box-shadow: 0 18px 40px rgba(51,188,230,.18);
+  overflow:hidden;
+  display:grid; place-items:center;
+  flex: 0 0 auto;
+}
+
+.loaderLogo img{width:100%;height:100%;object-fit:cover}
+
+.loaderName{
+  font-weight: 1000;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  font-size: 13px;
+  line-height: 1.1;
+}
+
+.loaderTagline{
+  margin-top:6px;
+  font-size: 12.5px;
+  color: rgba(234,240,255,.74);
+  line-height: 1.3;
+}
+
+.loaderLine{
+  height: 12px;
+  border-radius: 999px;
+  border:1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.05);
+  overflow:hidden;
+  position:relative;
+}
+
+.loaderBar{
+  display:block;
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(51,188,230,.95), rgba(47,224,200,.78));
+  box-shadow: 0 12px 30px rgba(51,188,230,.25);
+  transition: width .18s ease;
+}
+
+/* shine sweep */
+.loaderLine::after{
+  content:"";
+  position:absolute; top:-30px; left:-60px;
+  width: 50px; height: 80px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.22), transparent);
+  transform: rotate(18deg);
+  animation: loaderSweep 1.25s infinite linear;
+  opacity:.9;
+}
+@keyframes loaderSweep{
+  0%{left:-80px}
+  100%{left:110%}
+}
+
+.loaderMeta{
+  margin-top: 12px;
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  color: rgba(234,240,255,.70);
+  font-size: 12.5px;
+  font-weight: 800;
+}
+
+.loaderPct{
+  color: rgba(234,240,255,.90);
+  font-weight: 1000;
+}
+
+/* When loader is visible, prevent scroll */
+body.loading { overflow:hidden; }
+
+
   </style>
 </head>
 
 <body>
   <div class="texture" aria-hidden="true"></div>
+
+    <!-- ======================
+       PREMIUM PAGE LOADER
+  ======================= -->
+  <div id="pageLoader" class="loaderWrap" role="status" aria-live="polite" aria-label="Chargement">
+    <div class="loaderGlow" aria-hidden="true"></div>
+
+    <div class="loaderCard">
+      <div class="loaderBrand">
+        <div class="loaderLogo">
+          <img src="{% static 'assets/logo-rich.png' %}" alt="Rich Corporation"
+               onerror="this.style.display='none'; this.parentElement.innerHTML='<span style=&quot;font-weight:1000;color:#04142C;font-size:14px&quot;>RC</span>';">
+        </div>
+
+        <div class="loaderTitles">
+          <div class="loaderName">RICH CORPORATION</div>
+          <div class="loaderTagline" id="loaderTagline">De Nous vers Vous • Premium Assistance</div>
+        </div>
+      </div>
+
+      <div class="loaderLine">
+        <span class="loaderBar" id="loaderBar"></span>
+      </div>
+
+      <div class="loaderMeta">
+        <span id="loaderHint">Préparation de votre expérience…</span>
+        <span class="loaderPct" id="loaderPct">0%</span>
+      </div>
+    </div>
+  </div>
+
 
   <header>
     <div class="container">
@@ -839,6 +1030,67 @@
     }
 
     applyLang(); // also calls fetchPosts()
+
+
+
+  </script>
+
+
+  <script>
+    // ======================
+// Premium Loader
+// ======================
+(function(){
+  const loader = document.getElementById("pageLoader");
+  const bar = document.getElementById("loaderBar");
+  const pct = document.getElementById("loaderPct");
+  const hint = document.getElementById("loaderHint");
+
+  if(!loader || !bar || !pct) return;
+
+  document.body.classList.add("loading");
+
+  // Fake smooth progress until page is ready
+  let p = 0;
+  const steps = [
+    {at: 18, msg: "Chargement des ressources…"},
+    {at: 45, msg: "Préparation de l’interface…"},
+    {at: 72, msg: "Optimisation de l’expérience…"},
+    {at: 92, msg: "Finalisation…"},
+  ];
+
+  const timer = setInterval(()=>{
+    p = Math.min(96, p + Math.max(1, Math.round((96 - p) * 0.08)));
+    bar.style.width = p + "%";
+    pct.textContent = p + "%";
+
+    const s = steps.find(x => p >= x.at);
+    if(s && hint) hint.textContent = s.msg;
+  }, 120);
+
+  function finish(){
+    clearInterval(timer);
+    // Jump to 100 and fade out
+    bar.style.width = "100%";
+    pct.textContent = "100%";
+    if(hint) hint.textContent = "Bienvenue ✨";
+
+    setTimeout(()=>{
+      loader.classList.add("hide");
+      document.body.classList.remove("loading");
+
+      // remove from DOM after animation
+      setTimeout(()=>loader.remove(), 520);
+    }, 420);
+  }
+
+  // When everything is loaded
+  window.addEventListener("load", finish);
+
+  // Safety fallback
+  setTimeout(()=>{ if(document.body.classList.contains("loading")) finish(); }, 4200);
+})();
+
   </script>
 </body>
 </html>

@@ -11,11 +11,7 @@ services:
     env_file:
       - .env
     environment:
-      - DB_HOST=db
-      - DB_NAME=richcorpdb
-      - DB_USER=richcorpuser
-      - DB_PASS_FILE=/run/secrets/db_password
-      - DEBUG=0
+      - DJANGO_SETTINGS_MODULE=richcorp.settings_conf.production
       - REDIS_PASSWORD=my&redis!secret
     # command: sh -lc "python manage.py migrate && python manage.py collectstatic --noinput  --workers 3 --timeout 120"
     depends_on:

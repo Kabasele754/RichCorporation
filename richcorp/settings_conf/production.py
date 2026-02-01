@@ -1,6 +1,6 @@
 from .base import *
 
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = ['95.111.247.13','www.richcorporationsa.com','richcorporationsa.com','api.richcorporationsa.com', 'localhost', '127.0.0.1']
 # Liste des domaines autorisés pour les connexions

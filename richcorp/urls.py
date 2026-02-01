@@ -22,3 +22,10 @@ urlpatterns = [
 if settings.DEBUG:
 # urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    
+    
+# ✅ Error handlers (must be module-level)
+handler400 = "richcorp.error_views.bad_request"
+handler403 = "richcorp.error_views.permission_denied"
+handler404 = "richcorp.error_views.page_not_found"
+handler500 = "richcorp.error_views.server_error"

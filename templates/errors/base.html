@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ title|default:"Erreur" }} — Rich Corporation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet" />
+  <style>
+    :root{
+      --bg0:#050816; --bg1:#070C1F;
+      --text:#EAF0FF; --muted:rgba(234,240,255,.72);
+      --cyan:#33BCE6; --mint:#2FE0C8;
+      --shadow: 0 22px 70px rgba(0,0,0,.55);
+      --r:26px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      color:var(--text);
+      background:
+        radial-gradient(1200px 700px at 15% 10%, rgba(51,188,230,.18), transparent 62%),
+        radial-gradient(1000px 700px at 85% 22%, rgba(47,224,200,.14), transparent 62%),
+        linear-gradient(180deg, var(--bg0), var(--bg1));
+      min-height:100vh;
+      display:grid;
+      place-items:center;
+      padding:24px;
+    }
+    .card{
+      width:min(920px,100%);
+      border-radius:var(--r);
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.05);
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+    .top{
+      padding:22px 22px 0 22px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:16px;
+      flex-wrap:wrap;
+    }
+    .brand{
+      display:flex;align-items:center;gap:12px;
+      font-weight:800;letter-spacing:.5px;text-transform:uppercase;font-size:12px;
+      color:rgba(234,240,255,.88);
+    }
+    .logo{
+      width:40px;height:40px;border-radius:14px;
+      background:linear-gradient(135deg, rgba(51,188,230,.95), rgba(47,224,200,.75));
+      display:grid;place-items:center;color:#04142C;
+      font-weight:900;
+    }
+    .pill{
+      padding:10px 12px;border-radius:999px;
+      background:rgba(255,255,255,.05);
+      border:1px solid rgba(255,255,255,.10);
+      color:rgba(234,240,255,.78);
+      font-weight:700;font-size:12px;
+    }
+    .body{
+      padding:26px 22px 22px;
+    }
+    h1{margin:0 0 10px;font-size:clamp(28px,4vw,44px);letter-spacing:-.8px}
+    p{margin:0;color:var(--muted);line-height:1.75;font-size:14.5px;max-width:70ch}
+    .actions{
+      display:flex;gap:10px;flex-wrap:wrap;margin-top:18px
+    }
+    a.btn{
+      display:inline-flex;align-items:center;justify-content:center;gap:10px;
+      padding:12px 14px;border-radius:14px;border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.06);color:var(--text);
+      font-weight:800;font-size:14px;text-decoration:none;
+      transition:.2s ease;
+    }
+    a.btn:hover{transform:translateY(-1px);background:rgba(255,255,255,.09)}
+    a.btn.primary{
+      border:1px solid rgba(51,188,230,.35);
+      background:linear-gradient(135deg, rgba(51,188,230,.95), rgba(47,224,200,.75));
+      color:#04142C;
+    }
+    .footer{
+      padding:18px 22px 22px;
+      border-top:1px solid rgba(255,255,255,.08);
+      display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;
+      color:rgba(234,240,255,.62);
+      font-size:12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="top">
+      <div class="brand">
+        <div class="logo">RC</div>
+        <div>Rich Corporation</div>
+      </div>
+      <div class="pill">{{ code|default:"Error" }}</div>
+    </div>
+
+    <div class="body">
+      <h1>{{ title|default:"Une erreur est survenue" }}</h1>
+      <p>{{ message|default:"La page demandée n’est pas disponible." }}</p>
+
+      <div class="actions">
+        <a class="btn primary" href="/">🏠 Retour au site</a>
+        <a class="btn" href="javascript:history.back()">↩️ Page précédente</a>
+        <a class="btn" href="/admin/">⚙️ Admin</a>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div>© {% now "Y" %} Rich Corporation</div>
+      <div>Support: +27 63 360 5203 • richcorporation.co.za</div>
+    </div>
+  </div>
+</body>
+</html>

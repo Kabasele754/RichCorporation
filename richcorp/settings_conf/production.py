@@ -10,6 +10,11 @@ CSRF_TRUSTED_ORIGINS = [
     'https://api.richcorporationsa.com',
 ]
 
+CORS_ALLOWED_ORIGINS = [
+  "https://richcorporationsa.com",
+  "https://www.richcorporationsa.com",
+  "https://admin.richcorporationsa.com",
+]
 
 
 # Configuration de la politique de sécurité des contenus (CSP)

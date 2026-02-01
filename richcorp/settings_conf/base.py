@@ -157,16 +157,27 @@ PARLER_LANGUAGES = {
 }
 
 # Redis cache
-REDIS_URL = os.getenv("REDIS_URL", "")
-if REDIS_URL:
-    CACHES = {
-        "default": {
-            "BACKEND": "django.core.cache.backends.redis.RedisCache",
-            "LOCATION": REDIS_URL,
-            "TIMEOUT": 60 * 10,  # 10 minutes default
-        }
+# Redis cache (safe)
+REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/1")
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": REDIS_URL,
+        "TIMEOUT": 60 * 10,
+        "OPTIONS": {
+            "socket_connect_timeout": 2,
+            "socket_timeout": 2,
+            "retry_on_timeout": True,
+        },
     }
-else:
+}
+
+# Optional fallback if Redis down (prevents admin crash)
+try:
+    from django.core.cache import cache
+    cache.set("__ping__", "ok", 2)
+except Exception:
     CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
 
 # Google Translate (optional)

@@ -168,8 +168,8 @@
     .newsGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:10px}
     .newsCard{border-radius:26px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);box-shadow:var(--shadow2);overflow:hidden;display:flex;flex-direction:column;transition:.22s ease;min-height:320px}
     .newsCard:hover{transform:translateY(-2px)}
-    .newsThumb{height:150px;position:relative}
-    .newsThumb img{width:100%;height:100%;object-fit:cover;object-position:50% 35%;transform:scale(1.03);filter:saturate(1.04) contrast(1.05)}
+    .newsThumb{width: 100%;position:relative;  background:#111;display:flex; align-items:center;justify-content:center;flex:0 0 180px;overflow:hidden }
+    .newsThumb img{width:100%;height:100%;object-fit:contain;object-position:50% 35%;transform:scale(1.03);filter:saturate(1.04) contrast(1.05)}
     .newsThumb::after{content:"";position:absolute;inset:0;background:
       radial-gradient(700px 240px at 20% 0%, rgba(51,188,230,.18), transparent 70%),
       linear-gradient(to top, rgba(5,8,22,.78), rgba(5,8,22,.08) 60%)}

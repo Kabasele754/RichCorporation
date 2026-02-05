@@ -24,6 +24,8 @@ ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost").split("
 # Application definition
 
 INSTALLED_APPS = [
+    "django_extensions",
+    "apps.abc_apps.accounts",
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -39,6 +41,20 @@ INSTALLED_APPS = [
     "apps.common",
     "apps.blog",
     "apps.website",
+    
+    # ABC Apps
+    # "apps.abc_apps.commons",
+    
+    "apps.abc_apps.academics",
+    "apps.abc_apps.sessions_abc",
+    "apps.abc_apps.attendance",
+    "apps.abc_apps.exams",
+    "apps.abc_apps.feedback",
+    "apps.abc_apps.news",
+    "apps.abc_apps.speeches",
+    "apps.abc_apps.gate_security.apps.GateSecurityConfig",
+     "apps.abc_apps.access_control.apps.AccessControlConfig",
+    
     
     
 ]
@@ -104,6 +120,8 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
+
+AUTH_USER_MODEL = "accounts.User"
 
 
 # Internationalization

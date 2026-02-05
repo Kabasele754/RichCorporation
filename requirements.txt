@@ -69,3 +69,6 @@ stripe
 
 # Firebase
 firebase-admin
+django-extensions 
+graphviz
+

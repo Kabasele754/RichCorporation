@@ -5,11 +5,18 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ViewSet
 from rest_framework import status
+from rest_framework_simplejwt.views import TokenObtainPairView
 
-from commons.responses import ok, fail
+
 from apps.abc_apps.accounts.models import StudentProfile
-from apps.abc_apps.accounts.serializers import UserSerializer, StudentProfileSerializer, UpdateStudentLevelSerializer
+from apps.abc_apps.accounts.serializers import AppTokenObtainPairSerializer, UserSerializer, StudentProfileSerializer, UpdateStudentLevelSerializer
 from apps.abc_apps.accounts.permissions import IsSecretary, IsPrincipal
+from apps.common.responses import fail, ok
+
+
+class AppTokenObtainPairView(TokenObtainPairView):
+    serializer_class = AppTokenObtainPairSerializer
+
 
 class MeViewSet(ViewSet):
     permission_classes = [IsAuthenticated]

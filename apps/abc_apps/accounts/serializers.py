@@ -4,6 +4,8 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from apps.abc_apps.accounts.models import StudentProfile, TeacherProfile
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
 
 User = get_user_model()
 
@@ -29,3 +31,28 @@ class UpdateStudentLevelSerializer(serializers.Serializer):
     current_level = serializers.CharField(max_length=50)
     group_name = serializers.CharField(max_length=80)
     status = serializers.ChoiceField(choices=StudentProfile.STATUS_CHOICES, required=False)
+
+
+
+class AppTokenObtainPairSerializer(TokenObtainPairSerializer):
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        token["role"] = getattr(user, "role", "")
+        token["username"] = user.username
+        token["email"] = user.email
+        return token
+
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        u = self.user
+
+        data["user"] = {
+            "id": u.id,
+            "username": u.username,
+            "email": u.email,
+            "first_name": u.first_name,
+            "last_name": u.last_name,
+            "role": getattr(u, "role", ""),
+        }
+        return data

@@ -11,7 +11,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
 
 
 # SECURITY WARNING: don't run with debug turned on in production!
@@ -34,9 +33,11 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     
     
-     "rest_framework",
+    "rest_framework",
+    "rest_framework_simplejwt",
     "corsheaders",
     "parler",
+    "django_celery_beat",
 
     "apps.common",
     "apps.blog",
@@ -44,7 +45,6 @@ INSTALLED_APPS = [
     
     # ABC Apps
     # "apps.abc_apps.commons",
-    
     "apps.abc_apps.academics",
     "apps.abc_apps.sessions_abc",
     "apps.abc_apps.attendance",
@@ -53,7 +53,9 @@ INSTALLED_APPS = [
     "apps.abc_apps.news",
     "apps.abc_apps.speeches",
     "apps.abc_apps.gate_security.apps.GateSecurityConfig",
-     "apps.abc_apps.access_control.apps.AccessControlConfig",
+    "apps.abc_apps.access_control.apps.AccessControlConfig",
+    "apps.abc_apps.library.apps.LibraryConfig",
+    "apps.abc_apps.dashboards.apps.DashboardsConfig",
     
     
     
@@ -166,6 +168,10 @@ REST_FRAMEWORK = {
         "rest_framework.filters.SearchFilter",
         "rest_framework.filters.OrderingFilter",
     ],
+    
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ),
 }
 
 # Parler translations (models fields translated)
@@ -203,7 +209,18 @@ CHANNEL_LAYERS = {
     },
 }
 
+from celery.schedules import crontab
+
 CELERY_BEAT_SCHEDULE = {
-    
-   
+    # every day at 18:00 local time
+    "library_reading_reminders_daily": {
+        "task": "apps.abc_apps.library.tasks.send_reading_reminders_task",
+        "schedule": crontab(hour=18, minute=0),
+    },
+
+    # return reminders every 10 minutes
+    "library_return_reminders_every_10min": {
+        "task": "apps.abc_apps.library.tasks.send_return_reminders_task",
+        "schedule": crontab(minute="*/10"),
+    },
 }

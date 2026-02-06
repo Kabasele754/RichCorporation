@@ -14,6 +14,7 @@ urlpatterns = [
     # Register your models on your custom admin site
     path("admin/", rich_admin_site.urls),
     path("api/v1/", include("apps.blog.urls")),
+    path("api/", include("apps.abc_apps.accounts.urls")),
     
     # Frontend website
     path("", include("apps.website.urls")),

@@ -17,6 +17,8 @@ from apps.common.responses import fail, ok
 from rest_framework.views import APIView
 from rest_framework import status, permissions
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.permissions import AllowAny
+from rest_framework.parsers import JSONParser, FormParser, MultiPartParser
 
 
 class AppTokenObtainPairView(TokenObtainPairView):
@@ -109,7 +111,13 @@ def change_password(request):
 
 
 class LogoutView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    # permission_classes = [permissions.IsAuthenticated]
+    # ✅ Important: ne pas exiger access valide (AllowAny),
+    # sinon si access expiré => logout impossible.
+    permission_classes = [AllowAny]
+
+    # ✅ Important: pour que request.data lise bien le JSON
+    parser_classes = [JSONParser, FormParser, MultiPartParser]
 
     def post(self, request):
         refresh = request.data.get("refresh")

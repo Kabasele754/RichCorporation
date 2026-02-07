@@ -14,6 +14,10 @@ from apps.abc_apps.accounts.serializers import AppTokenObtainPairSerializer, Cha
 from apps.abc_apps.accounts.permissions import IsSecretary, IsPrincipal
 from apps.common.responses import fail, ok
 
+from rest_framework.views import APIView
+from rest_framework import status, permissions
+from rest_framework_simplejwt.tokens import RefreshToken
+
 
 class AppTokenObtainPairView(TokenObtainPairView):
     serializer_class = AppTokenObtainPairSerializer
@@ -103,6 +107,27 @@ def change_password(request):
 
     return ok({"message": "Password updated successfully."})
 
+
+class LogoutView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        refresh = request.data.get("refresh")
+        if not refresh:
+            return Response(
+                {"detail": "refresh token is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            token = RefreshToken(refresh)
+            token.blacklist()  # ✅ invalide le refresh token
+            return Response({"detail": "Logged out"}, status=status.HTTP_200_OK)
+        except Exception:
+            return Response(
+                {"detail": "Invalid refresh token"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 class SecretaryStudentAdminViewSet(ViewSet):
     permission_classes = [IsAuthenticated, (IsSecretary | IsPrincipal)]
 

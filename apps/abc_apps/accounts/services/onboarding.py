@@ -1,25 +1,92 @@
-# =========================
-# apps/accounts/services/onboarding.py
-# =========================
+from typing import Optional, Dict, Any
 from django.contrib.auth import get_user_model
-from apps.abc_apps.accounts.models import StudentProfile, TeacherProfile
+from django.db import transaction
+
+from apps.abc_apps.accounts.models import (
+    StudentProfile,
+    TeacherProfile,
+    SecretaryProfile,
+    PrincipalProfile,
+    SecurityProfile,
+)
 
 User = get_user_model()
 
-def create_student(username: str, password: str, full_name: str, student_code: str, level: str, group_name: str, email: str = ""):
-    user = User.objects.create_user(username=username, password=password, email=email, role="student", first_name=full_name)
-    profile = StudentProfile.objects.create(user=user, student_code=student_code, current_level=level, group_name=group_name)
-    return user, profile
 
-def create_teacher(username: str, password: str, full_name: str, teacher_code: str, speciality: str, email: str = ""):
-    user = User.objects.create_user(username=username, password=password, email=email, role="teacher", first_name=full_name)
-    profile = TeacherProfile.objects.create(user=user, teacher_code=teacher_code, speciality=speciality)
-    return user, profile
+@transaction.atomic
+def create_user_with_profile(
+    *,
+    username: str,
+    password: str,
+    role: str,
+    email: str = "",
+    first_name: str = "",
+    last_name: str = "",
+    code: str = "",
+    extra: Optional[Dict[str, Any]] = None,
+):
+    """
+    Creates a user + the correct profile for the role.
+    - role: student/teacher/secretary/principal/security
+    - code: student_code / teacher_code / etc.
+    - extra: extra fields (level/group, speciality, shift/shifts)
+    """
+    extra = extra or {}
 
-def create_secretary(username: str, password: str, full_name: str, email: str = ""):
-    user = User.objects.create_user(username=username, password=password, email=email, role="secretary", first_name=full_name)
-    return user
+    user = User.objects.create_user(
+        username=username,
+        password=password,
+        email=email,
+        first_name=first_name,
+        last_name=last_name,
+        role=role,
+    )
 
-def create_principal(username: str, password: str, full_name: str, email: str = ""):
-    user = User.objects.create_user(username=username, password=password, email=email, role="principal", first_name=full_name)
+    if role == "student":
+        StudentProfile.objects.create(
+            user=user,
+            student_code=code,
+            current_level=extra.get("current_level", "Foundation 1"),
+            group_name=extra.get("group_name", "Default Group"),
+            status=extra.get("status", "active"),
+        )
+
+    elif role == "teacher":
+        TeacherProfile.objects.create(
+            user=user,
+            teacher_code=code,
+            speciality=extra.get("speciality", "support"),
+        )
+
+    elif role == "secretary":
+        SecretaryProfile.objects.create(
+            user=user,
+            secretary_code=code,
+        )
+
+    elif role == "principal":
+        PrincipalProfile.objects.create(
+            user=user,
+            principal_code=code,
+        )
+
+    elif role == "security":
+        # ✅ support both old field "shift" and new field "shifts"
+        shifts = extra.get("shifts")
+        shift = extra.get("shift")
+
+        fields = {"user": user, "security_code": code}
+
+        # If model has "shifts" field, use it
+        if hasattr(SecurityProfile, "shifts"):
+            if shifts is None:
+                shifts = [shift or "morning"]
+                fields["shifts"] = shifts
+        else:
+                # fallback old model
+                fields["shift"] = shift or "morning"
+
+        SecurityProfile.objects.create(**fields)
+
+
     return user

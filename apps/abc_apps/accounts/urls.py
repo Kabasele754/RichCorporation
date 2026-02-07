@@ -4,7 +4,7 @@
 from django.urls import path, include
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework.routers import DefaultRouter
-from apps.abc_apps.accounts.views import AppTokenObtainPairView, MeViewSet, SecretaryStudentAdminViewSet
+from apps.abc_apps.accounts.views import AppTokenObtainPairView, MeViewSet, SecretaryStudentAdminViewSet, change_password, me, me_update
 
 router = DefaultRouter()
 router.register(r"me", MeViewSet, basename="me")
@@ -14,4 +14,7 @@ urlpatterns = [
     path("", include(router.urls)),
     path("auth/login/", AppTokenObtainPairView.as_view(), name="auth-login"),
     path("auth/refresh/", TokenRefreshView.as_view(), name="auth-refresh"),
+     path("auth/me/", me, name="auth-me"),
+     path("auth/me/update/", me_update, name="auth-me-update"),
+path("auth/change-password/", change_password, name="auth-change-password"),
 ]

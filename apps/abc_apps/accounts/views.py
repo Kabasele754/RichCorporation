@@ -10,7 +10,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from apps.abc_apps.accounts.models import StudentProfile
-from apps.abc_apps.accounts.serializers import AppTokenObtainPairSerializer, ChangePasswordSerializer, MeSerializer, MeUpdateSerializer, UserSerializer, StudentProfileSerializer, UpdateStudentLevelSerializer
+from apps.abc_apps.accounts.serializers import AppTokenObtainPairSerializer, ChangePasswordSerializer, LogoutSerializer, MeSerializer, MeUpdateSerializer, UserSerializer, StudentProfileSerializer, UpdateStudentLevelSerializer
 from apps.abc_apps.accounts.permissions import IsSecretary, IsPrincipal
 from apps.common.responses import fail, ok
 
@@ -19,6 +19,7 @@ from rest_framework import status, permissions
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import AllowAny
 from rest_framework.parsers import JSONParser, FormParser, MultiPartParser
+from rest_framework import generics
 
 
 class AppTokenObtainPairView(TokenObtainPairView):
@@ -110,32 +111,18 @@ def change_password(request):
     return ok({"message": "Password updated successfully."})
 
 
-class LogoutView(APIView):
-    # permission_classes = [permissions.IsAuthenticated]
-    # ✅ Important: ne pas exiger access valide (AllowAny),
-    # sinon si access expiré => logout impossible.
-    permission_classes = [AllowAny]
-
-    # ✅ Important: pour que request.data lise bien le JSON
-    parser_classes = [JSONParser, FormParser, MultiPartParser]
+class LogoutAPIView(generics.GenericAPIView):
+    serializer_class = LogoutSerializer
+    permission_classes = (IsAuthenticated,)
+    parser_classes = (JSONParser, FormParser, MultiPartParser)
 
     def post(self, request):
-        refresh = request.data.get("refresh")
-        if not refresh:
-            return Response(
-                {"detail": "refresh token is required"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        try:
-            token = RefreshToken(refresh)
-            token.blacklist()  # ✅ invalide le refresh token
-            return Response({"detail": "Logged out"}, status=status.HTTP_200_OK)
-        except Exception:
-            return Response(
-                {"detail": "Invalid refresh token"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({'msg':'Logout Success'}, status=status.HTTP_200_OK)
+            
+            
 class SecretaryStudentAdminViewSet(ViewSet):
     permission_classes = [IsAuthenticated, (IsSecretary | IsPrincipal)]
 

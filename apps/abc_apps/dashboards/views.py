@@ -4,7 +4,7 @@
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 
-from common.responses import ok, fail
+from apps.common.responses import ok, fail
 from apps.abc_apps.dashboards.permissions import (
     IsPrincipal, IsSecretary, IsTeacher, IsSecurity, IsPrincipalOrSecretary
 )

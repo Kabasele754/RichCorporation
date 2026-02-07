@@ -14,7 +14,7 @@ urlpatterns = [
     path("", include(router.urls)),
     path("auth/login/", AppTokenObtainPairView.as_view(), name="auth-login"),
     path("auth/refresh/", TokenRefreshView.as_view(), name="auth-refresh"),
-     path("auth/me/", me, name="auth-me"),
-     path("auth/me/update/", me_update, name="auth-me-update"),
-path("auth/change-password/", change_password, name="auth-change-password"),
+    path("auth/me/", me, name="auth-me"),
+    path("auth/me/update/", me_update, name="auth-me-update"),
+    path("auth/change-password/", change_password, name="auth-change-password"),
 ]

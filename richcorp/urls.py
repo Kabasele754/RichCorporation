@@ -15,7 +15,7 @@ urlpatterns = [
     path("admin/", rich_admin_site.urls),
     path("api/v1/", include("apps.blog.urls")),
     path("api/", include("apps.abc_apps.accounts.urls")),
-    
+    path("api/dashboards/v1/", include("apps.abc_apps.dashboards.urls")),
     # Frontend website
     path("", include("apps.website.urls")),
 ]

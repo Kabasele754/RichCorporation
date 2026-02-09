@@ -3,12 +3,12 @@
 # =========================
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.permissions import IsAuthenticated
-from commons.pagination import StandardPagination
+from apps.common.pagination import StandardPagination
 from apps.abc_apps.academics.models import ClassRoom, Course, TeacherCourseAssignment, MonthlyGoal
 from apps.abc_apps.academics.serializers import (
     ClassRoomSerializer, CourseSerializer, TeacherCourseAssignmentSerializer, MonthlyGoalSerializer
 )
-from commons.permissions import IsStaffOrPrincipal, IsSecretary
+from apps.common.permissions import IsStaffOrPrincipal, IsSecretary
 
 class ClassRoomViewSet(ModelViewSet):
     queryset = ClassRoom.objects.all().order_by("-created_at")

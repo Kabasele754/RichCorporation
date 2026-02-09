@@ -3,7 +3,7 @@
 # =========================
 from datetime import timedelta
 from django.utils import timezone
-from commons.utils import make_token
+from apps.common.utils import make_token
 from apps.abc_apps.sessions_abc.models import AttendanceToken, ClassSession
 
 DEFAULT_TTL_MINUTES = 180  # 3h (tu peux changer)

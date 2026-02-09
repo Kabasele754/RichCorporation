@@ -6,8 +6,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework import status
 
-from commons.responses import ok, fail
-from commons.permissions import IsSecretary, IsStaffOrPrincipal
+from apps.common.responses import ok, fail
+from apps.common.permissions import IsSecretary, IsStaffOrPrincipal
 from apps.abc_apps.sessions_abc.models import ClassSession, SessionTeacher
 from apps.abc_apps.sessions_abc.serializers import (
     ClassSessionSerializer, SessionTeacherSerializer,

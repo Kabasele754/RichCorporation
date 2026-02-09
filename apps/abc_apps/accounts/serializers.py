@@ -13,6 +13,8 @@ from apps.abc_apps.accounts.models import (
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 
+from apps.abc_apps.accounts.services.onboarding import create_user_with_profile
+
 User = get_user_model()
 
 
@@ -254,3 +256,46 @@ class LogoutSerializer(serializers.Serializer):
             RefreshToken(self.token).blacklist()
         except TokenError:
             self.fail('bad_token')
+            
+            
+            
+            
+class TeacherCreateSerializer(serializers.Serializer):
+    username = serializers.CharField()
+    email = serializers.EmailField(required=False, allow_blank=True)
+    first_name = serializers.CharField(required=False, allow_blank=True)
+    last_name = serializers.CharField(required=False, allow_blank=True)
+
+    teacher_code = serializers.CharField()
+    speciality = serializers.CharField(required=False, allow_blank=True)
+
+    # optionnel : si tu veux permettre de définir un password
+    password = serializers.CharField(required=False, allow_blank=True, write_only=True)
+
+    def validate_username(self, value):
+      if User.objects.filter(username=value).exists():
+          raise serializers.ValidationError("Username already exists.")
+      return value
+
+    def validate_teacher_code(self, value):
+      if TeacherProfile.objects.filter(teacher_code=value).exists():
+          raise serializers.ValidationError("Teacher code already exists.")
+      return value
+
+    def create(self, validated_data):
+        pwd = validated_data.get("password") or "abc1234"
+
+        user = create_user_with_profile(
+            username=validated_data["username"],
+            password=pwd,
+            role="teacher",
+            email=validated_data.get("email", ""),
+            first_name=validated_data.get("first_name", ""),
+            last_name=validated_data.get("last_name", ""),
+            code=validated_data["teacher_code"],
+            extra={"speciality": validated_data.get("speciality", "support")},
+        )
+        return user
+    
+    
+    

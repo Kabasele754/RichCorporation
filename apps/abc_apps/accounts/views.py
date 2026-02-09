@@ -10,8 +10,9 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from apps.abc_apps.accounts.models import StudentProfile
-from apps.abc_apps.accounts.serializers import AppTokenObtainPairSerializer, ChangePasswordSerializer, LogoutSerializer, MeSerializer, MeUpdateSerializer, UserSerializer, StudentProfileSerializer, UpdateStudentLevelSerializer
+from apps.abc_apps.accounts.serializers import AppTokenObtainPairSerializer, ChangePasswordSerializer, LogoutSerializer, MeSerializer, MeUpdateSerializer, TeacherCreateSerializer, UserSerializer, StudentProfileSerializer, UpdateStudentLevelSerializer
 from apps.abc_apps.accounts.permissions import IsSecretary, IsPrincipal
+from apps.common.permissions import IsStaffOrPrincipal
 from apps.common.responses import fail, ok
 
 from rest_framework.views import APIView
@@ -138,3 +139,28 @@ class SecretaryStudentAdminViewSet(ViewSet):
             sp.status = ser.validated_data["status"]
         sp.save()
         return ok(StudentProfileSerializer(sp).data, message="Student level updated", status=status.HTTP_200_OK)
+    
+
+
+class SecretaryTeacherViewSet(ViewSet):
+    permission_classes = [IsAuthenticated, (IsSecretary | IsStaffOrPrincipal)]
+
+    @action(detail=False, methods=["post"])
+    def create_teacher(self, request):
+        ser = TeacherCreateSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        user = ser.save()
+
+        # réponse simple
+        return ok(
+            {
+                "user_id": user.id,
+                "username": user.username,
+                "full_name": user.get_full_name() if hasattr(user, "get_full_name") else f"{user.first_name} {user.last_name}",
+                "role": user.role,
+                "default_password": "abc1234" if not request.data.get("password") else None,
+            },
+            message="Teacher created successfully",
+            status=status.HTTP_201_CREATED,
+        )
+        

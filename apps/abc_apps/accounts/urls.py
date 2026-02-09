@@ -4,11 +4,12 @@
 from django.urls import path, include
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework.routers import DefaultRouter
-from apps.abc_apps.accounts.views import AppTokenObtainPairView, LogoutAPIView, MeViewSet, SecretaryStudentAdminViewSet, change_password, me, me_update
+from apps.abc_apps.accounts.views import AppTokenObtainPairView, LogoutAPIView, MeViewSet, SecretaryStudentAdminViewSet, SecretaryTeacherViewSet, change_password, me, me_update
 
 router = DefaultRouter()
 router.register(r"me", MeViewSet, basename="me")
 router.register(r"secretary/students", SecretaryStudentAdminViewSet, basename="secretary-students")
+router.register(r"secretary", SecretaryTeacherViewSet, basename="secretary")
 
 urlpatterns = [
     path("", include(router.urls)),

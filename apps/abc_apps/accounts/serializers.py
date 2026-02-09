@@ -257,8 +257,27 @@ class LogoutSerializer(serializers.Serializer):
         except TokenError:
             self.fail('bad_token')
             
-            
-            
+
+class TeacherListSerializer(serializers.ModelSerializer):
+    user_id = serializers.IntegerField(source="user.id", read_only=True)
+    username = serializers.CharField(source="user.username", read_only=True)
+    email = serializers.EmailField(source="user.email", read_only=True)
+    full_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TeacherProfile
+        fields = (
+            "id",            # TeacherProfile id
+            "user_id",       # User id
+            "username",
+            "full_name",
+            "email",
+            "teacher_code",
+            "speciality",
+        )
+
+    def get_full_name(self, obj):
+        return obj.user.get_full_name() or obj.user.username         
             
 class TeacherCreateSerializer(serializers.Serializer):
     username = serializers.CharField()

@@ -1,6 +1,7 @@
 # =========================
 # apps/accounts/views.py
 # =========================
+from django.db.models import Q
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ViewSet
@@ -9,8 +10,8 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from apps.abc_apps.accounts.models import StudentProfile
-from apps.abc_apps.accounts.serializers import AppTokenObtainPairSerializer, ChangePasswordSerializer, LogoutSerializer, MeSerializer, MeUpdateSerializer, TeacherCreateSerializer, UserSerializer, StudentProfileSerializer, UpdateStudentLevelSerializer
+from apps.abc_apps.accounts.models import StudentProfile, TeacherProfile
+from apps.abc_apps.accounts.serializers import AppTokenObtainPairSerializer, ChangePasswordSerializer, LogoutSerializer, MeSerializer, MeUpdateSerializer, TeacherCreateSerializer, TeacherListSerializer, UserSerializer, StudentProfileSerializer, UpdateStudentLevelSerializer
 from apps.abc_apps.accounts.permissions import IsSecretary, IsPrincipal
 from apps.common.permissions import IsStaffOrPrincipal
 from apps.common.responses import fail, ok
@@ -145,22 +146,49 @@ class SecretaryStudentAdminViewSet(ViewSet):
 class SecretaryTeacherViewSet(ViewSet):
     permission_classes = [IsAuthenticated, (IsSecretary | IsStaffOrPrincipal)]
 
+    # ✅ GET /api/secretary/teachers/?q=...
+    @action(detail=False, methods=["get"])
+    def teachers(self, request):
+        q = request.query_params.get("q", "").strip()
+
+        qs = TeacherProfile.objects.select_related("user")
+
+        # ✅ filtre (search)
+        if q:
+            qs = qs.filter(
+                Q(user__username__icontains=q) |
+                Q(user__first_name__icontains=q) |
+                Q(user__last_name__icontains=q) |
+                Q(user__email__icontains=q) |
+                Q(teacher_code__icontains=q) |
+                Q(speciality__icontains=q)
+            )
+
+        qs = qs.order_by("user__last_name", "user__first_name")
+        ser = TeacherListSerializer(qs, many=True)
+
+        # ✅ ton wrapper ok() renvoie déjà {data: ...}
+        return ok(ser.data, message="Teachers list", status=status.HTTP_200_OK)
+
+    # ✅ POST /api/secretary/create_teacher/
     @action(detail=False, methods=["post"])
     def create_teacher(self, request):
         ser = TeacherCreateSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
-        user = ser.save()
 
-        # réponse simple
+        user = ser.save()  # ⚠️ IMPORTANT : doit retourner User (pas tuple)
+
         return ok(
             {
                 "user_id": user.id,
                 "username": user.username,
-                "full_name": user.get_full_name() if hasattr(user, "get_full_name") else f"{user.first_name} {user.last_name}",
-                "role": user.role,
+                "full_name": user.get_full_name() or user.username,
+                "role": getattr(user, "role", "teacher"),
                 "default_password": "abc1234" if not request.data.get("password") else None,
             },
             message="Teacher created successfully",
             status=status.HTTP_201_CREATED,
         )
         
+        
+            

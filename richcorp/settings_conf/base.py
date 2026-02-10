@@ -239,7 +239,7 @@ CELERY_BEAT_SCHEDULE = {
     },
     
     "generate-periods-every-year-jan-1": {
-        "task": "apps.abc_apps.academics.tasks.ensure_periods_for_year",
+        "task": "apps.abc_apps.academics.tasks.ensure_periods_for_current_year",
         "schedule": crontab(minute=5, hour=0, day_of_month=10, month_of_year=2),  # Jan 1st 00:05
         "args": (2026,),  # ✅ option 1 (fixe, pas top)
     },

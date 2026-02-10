@@ -237,4 +237,15 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.abc_apps.library.tasks.send_return_reminders_task",
         "schedule": crontab(minute="*/10"),
     },
+    
+    "generate-periods-every-year-jan-1": {
+        "task": "apps.abc_apps.academics.tasks.ensure_periods_for_year",
+        "schedule": crontab(minute=5, hour=0, day_of_month=1, month_of_year=1),  # Jan 1st 00:05
+        "args": (2026,),  # ✅ option 1 (fixe, pas top)
+    },
+    
+     "generate-periods-next-year-dec-15": {
+        "task": "apps.abc_apps.academics.tasks.ensure_periods_for_next_year",
+        "schedule": crontab(minute=0, hour=1, day_of_month=25, month_of_year=12),  # 15 Dec 01:00
+    }
 }

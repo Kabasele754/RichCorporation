@@ -1,6 +1,7 @@
 # =========================
 # apps/academics/views.py
 # =========================
+from django.utils import timezone
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import ValidationError
@@ -37,15 +38,22 @@ from apps.abc_apps.academics.serializers import (
 # AcademicPeriod
 # ─────────────────────────────────────────────
 class AcademicPeriodViewSet(ModelViewSet):
-    queryset = AcademicPeriod.objects.all().order_by("-year", "-month")
     serializer_class = AcademicPeriodSerializer
     permission_classes = [IsAuthenticated, (IsSecretary | IsStaffOrPrincipal)]
     pagination_class = StandardPagination
 
+    def get_queryset(self):
+        now = timezone.now()
+        return AcademicPeriod.objects.filter(
+            year=now.year,
+            month=now.month,
+        ).order_by("-year", "-month")
+
     def perform_destroy(self, instance):
-        # exemple: bloquer suppression si période cloturée
         if instance.is_closed:
-            raise ValidationError("This academic period is closed and cannot be deleted.")
+            raise ValidationError(
+                "This academic period is closed and cannot be deleted."
+            )
         super().perform_destroy(instance)
 
 

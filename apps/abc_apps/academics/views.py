@@ -81,43 +81,57 @@ class RoomViewSet(ModelViewSet):
 # MonthlyClassGroup
 # ─────────────────────────────────────────────
 class MonthlyClassGroupViewSet(ModelViewSet):
-    queryset = MonthlyClassGroup.objects.select_related("period", "level", "room").all()
+    queryset = MonthlyClassGroup.objects.select_related(
+        "period", "level", "room"
+    )
     serializer_class = MonthlyClassGroupSerializer
     permission_classes = [IsAuthenticated, (IsSecretary | IsStaffOrPrincipal)]
     pagination_class = StandardPagination
 
     def get_queryset(self):
         qs = super().get_queryset()
+
+        # 🔎 Query params
         period = self.request.query_params.get("period")
         level = self.request.query_params.get("level")
         room = self.request.query_params.get("room")
 
-        if period:
+        # ✅ DEFAULT : mois + année courants
+        if not period:
+            now = timezone.now()
+            qs = qs.filter(
+                period__year=now.year,
+                period__month=now.month,
+            )
+        else:
             qs = qs.filter(period_id=period)
+
         if level:
             qs = qs.filter(level_id=level)
+
         if room:
             qs = qs.filter(room_id=room)
+
         return qs
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
 
     def perform_update(self, serializer):
-        # Ici tu peux aussi imposer created_by immuable si tu veux
         serializer.save()
 
     def perform_destroy(self, instance):
-        # exemple: empêcher suppression si période clôturée
         if instance.period and instance.period.is_closed:
-            raise ValidationError("Cannot delete a group in a closed period.")
+            raise ValidationError(
+                "Cannot delete a group in a closed period."
+            )
 
-        # exemple: empêcher suppression si des étudiants y sont déjà assignés
-        if instance.students.exists():  # related_name="students" sur StudentMonthlyEnrollment.group
-            raise ValidationError("Cannot delete this group because it has enrolled students.")
+        if instance.students.exists():
+            raise ValidationError(
+                "Cannot delete this group because it has enrolled students."
+            )
 
         super().perform_destroy(instance)
-
 
 # ─────────────────────────────────────────────
 # StudentMonthlyEnrollment
@@ -190,14 +204,21 @@ class TeacherCourseAssignmentViewSet(ModelViewSet):
         period = self.request.query_params.get("period")
         monthly_group = self.request.query_params.get("monthly_group")
 
+        # ✅ DEFAULT : période du mois courant (si period absent)
+        if not period:
+            now = timezone.now()
+            qs = qs.filter(period__year=now.year, period__month=now.month)
+        else:
+            qs = qs.filter(period_id=period)
+
         if teacher:
             qs = qs.filter(teacher_id=teacher)
         if classroom:
             qs = qs.filter(classroom_id=classroom)
         if course:
             qs = qs.filter(course_id=course)
-        if period:
-            qs = qs.filter(period_id=period)
+
+        # ✅ monthly_group filtre (garde ton filtre)
         if monthly_group:
             qs = qs.filter(monthly_group_id=monthly_group)
 
@@ -207,7 +228,6 @@ class TeacherCourseAssignmentViewSet(ModelViewSet):
         serializer.save(created_by=self.request.user)
 
     def perform_update(self, serializer):
-        # exemple: bloquer modification si période clôturée
         inst = self.get_object()
         if inst.period and inst.period.is_closed:
             raise ValidationError("Cannot update assignment in a closed period.")
@@ -217,7 +237,6 @@ class TeacherCourseAssignmentViewSet(ModelViewSet):
         if instance.period and instance.period.is_closed:
             raise ValidationError("Cannot delete assignment in a closed period.")
         super().perform_destroy(instance)
-
 
 # ─────────────────────────────────────────────
 # ClassRoom

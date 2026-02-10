@@ -38,6 +38,7 @@ from apps.abc_apps.academics.serializers import (
 # AcademicPeriod
 # ─────────────────────────────────────────────
 class AcademicPeriodViewSet(ModelViewSet):
+    queryset = AcademicPeriod.objects.all()  # requis par DRF
     serializer_class = AcademicPeriodSerializer
     permission_classes = [IsAuthenticated, (IsSecretary | IsStaffOrPrincipal)]
     pagination_class = StandardPagination

@@ -7,24 +7,24 @@ from .models import StudentProfile, TeacherProfile, SecretaryProfile, PrincipalP
 
 
 @admin.register(User)
-class UserAdmin(DjangoUserAdmin):
-    fieldsets = DjangoUserAdmin.fieldsets + (
-        ("ABC Role", {"fields": ("role",)}),
-    )
-    list_display = (
-        "username",
-        "email",
-        "first_name",
-        "last_name",
-        "role",
-        "is_staff",
-        "is_active",
-        "lat",
-        "lng",
-        "location_updated_at",
-    )
-    list_filter = ("role", "is_staff", "is_active")
-    search_fields = ("username", "email", "first_name", "last_name")
+# class UserAdmin(DjangoUserAdmin):
+#     fieldsets = DjangoUserAdmin.fieldsets + (
+#         ("ABC Role", {"fields": ("role",)}),
+#     )
+#     list_display = (
+#         "username",
+#         "email",
+#         "first_name",
+#         "last_name",
+#         "role",
+#         "is_staff",
+#         "is_active",
+#         "lat",
+#         "lng",
+#         "location_updated_at",
+#     )
+#     list_filter = ("role", "is_staff", "is_active")
+#     search_fields = ("username", "email", "first_name", "last_name")
 
 
 @admin.register(StudentProfile)

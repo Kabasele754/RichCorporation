@@ -39,8 +39,8 @@ class User(AbstractUser):
     country = models.CharField(max_length=60, blank=True, null=True, default="South Africa")
 
     # ✅ Last known GPS location (useful for attendance scan context)
-    lat = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True)
-    lng = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True)
+    lat = models.DecimalField(max_digits=20, decimal_places=14, blank=True, null=True)
+    lng = models.DecimalField(max_digits=20, decimal_places=14, blank=True, null=True)
     location_updated_at = models.DateTimeField(blank=True, null=True)
 
     def set_location(self, lat: float, lng: float):

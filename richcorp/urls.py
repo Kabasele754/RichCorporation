@@ -10,9 +10,9 @@ from richcorp.admin_site import rich_admin_site
 rich_admin_site.register(Post, PostAdmin)
 
 urlpatterns = [
-    # path("admin/", admin.site.urls),
+    path("admin/", admin.site.urls),
     # Register your models on your custom admin site
-    path("admin/", rich_admin_site.urls),
+    # path("admin/", rich_admin_site.urls),
     path("api/v1/", include("apps.blog.urls")),
     path("api/", include("apps.abc_apps.accounts.urls")),
     path("api/academics/", include("apps.abc_apps.academics.urls")),

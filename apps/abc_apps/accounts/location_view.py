@@ -9,8 +9,8 @@ from apps.common.responses import ok, fail
 
 
 class MeLocationSerializer(serializers.Serializer):
-    lat = serializers.DecimalField(max_digits=9, decimal_places=6)
-    lng = serializers.DecimalField(max_digits=9, decimal_places=6)
+    lat = serializers.DecimalField(max_digits=29, decimal_places=16)
+    lng = serializers.DecimalField(max_digits=29, decimal_places=16)
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])

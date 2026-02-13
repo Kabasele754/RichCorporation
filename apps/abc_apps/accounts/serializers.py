@@ -241,8 +241,8 @@ class MeUpdateSerializer(serializers.Serializer):
     country = serializers.CharField(required=False, allow_blank=True)
 
     # ✅ location
-    lat = serializers.DecimalField(required=False, max_digits=9, decimal_places=6)
-    lng = serializers.DecimalField(required=False, max_digits=9, decimal_places=6)
+    lat = serializers.DecimalField(required=False, max_digits=29, decimal_places=16)
+    lng = serializers.DecimalField(required=False, max_digits=29, decimal_places=16)
 
     # ✅ role profile fields (tu avais déjà)
     current_level = serializers.CharField(required=False, allow_blank=True)

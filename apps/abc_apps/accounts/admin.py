@@ -2,9 +2,8 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth import get_user_model
 
-from .models import StudentProfile, TeacherProfile, SecretaryProfile, PrincipalProfile, SecurityProfile
+from .models import StudentProfile, TeacherProfile, SecretaryProfile, PrincipalProfile, SecurityProfile, User
 
-User = get_user_model()
 
 
 @admin.register(User)

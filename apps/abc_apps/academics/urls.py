@@ -8,7 +8,7 @@ from apps.abc_apps.academics.views import AcademicLevelViewSet, AcademicPeriodVi
 router = DefaultRouter()
 router.register(r"classrooms", ClassRoomViewSet)
 router.register(r"courses", CourseViewSet)
-router.register(r"students", StudentMonthlyEnrollmentViewSet, basename="student-enrollments")
+router.register(r"students-enrollments", StudentMonthlyEnrollmentViewSet, basename="student-enrollments")
 router.register(r"teacher-assignments", TeacherCourseAssignmentViewSet, basename="teacher-assignments")
 router.register(r"assignments", TeacherCourseAssignmentViewSet)
 router.register(r"goals", MonthlyGoalViewSet)

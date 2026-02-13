@@ -4,6 +4,8 @@
 from django.urls import path, include
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework.routers import DefaultRouter
+from apps.abc_apps.accounts.location_view import me_location_update
+from apps.abc_apps.accounts.location_view import me_location_update
 from apps.abc_apps.accounts.upload_profile_photo import delete_profile_photo, upload_profile_photo
 from apps.abc_apps.accounts.views import AppTokenObtainPairView, LogoutAPIView, MeViewSet, SecretaryStudentAdminViewSet, SecretaryTeacherViewSet, change_password, me, me_update
 from apps.abc_apps.accounts.views_verification import VerifyConfirmView, VerifyMyDocsView, VerifyUploadIdView
@@ -30,4 +32,7 @@ urlpatterns = [
      # ✅ photo
     path("auth/me/upload-photo/", upload_profile_photo, name="auth-upload-photo"),
     path("auth/me/delete-photo/", delete_profile_photo, name="auth-delete-photo"),
+    
+    # location
+    path("auth/me/location/", me_location_update, name="auth-me-location"),
 ]

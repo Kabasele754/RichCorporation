@@ -22,11 +22,27 @@ User = get_user_model()
 # Base user
 # -------------------------
 class UserSerializer(serializers.ModelSerializer):
+    profile_photo_url = serializers.SerializerMethodField()
+
     class Meta:
         model = User
-        fields = ["id", "username", "email", "first_name", "last_name", "role"]
+        fields = [
+            "id", "username", "email",
+            "first_name", "middle_name", "last_name",
+            "role",
+            "profile_photo_url",
+            "address_line1", "address_line2", "city", "province", "postal_code", "country",
+            "lat", "lng", "location_updated_at",
+        ]
 
-
+    def get_profile_photo_url(self, obj):
+        if not obj.profile_photo:
+            return None
+        request = self.context.get("request")
+        url = obj.profile_photo.url
+        return request.build_absolute_uri(url) if request else url
+    
+    
 # -------------------------
 # Profiles
 # -------------------------
@@ -182,27 +198,24 @@ class MeSerializer(serializers.Serializer):
     profile = serializers.DictField(required=False, allow_null=True)
 
     def to_representation(self, instance):
+        request = self.context.get("request")
         u = instance
         role = getattr(u, "role", "student")
 
-        payload = {"user": UserSerializer(u).data, "profile": None}
+        payload = {"user": UserSerializer(u, context={"request": request}).data, "profile": None}
 
         if role == "student":
             sp = getattr(u, "student_profile", None)
             payload["profile"] = StudentProfileSerializer(sp).data if sp else None
-
         elif role == "teacher":
             tp = getattr(u, "teacher_profile", None)
             payload["profile"] = TeacherProfileSerializer(tp).data if tp else None
-
         elif role == "secretary":
             sec = getattr(u, "secretary_profile", None)
             payload["profile"] = SecretaryProfileSerializer(sec).data if sec else None
-
         elif role == "principal":
             pr = getattr(u, "principal_profile", None)
             payload["profile"] = PrincipalProfileSerializer(pr).data if pr else None
-
         elif role == "security":
             sp = getattr(u, "security_profile", None)
             payload["profile"] = SecurityProfileSerializer(sp).data if sp else None
@@ -213,19 +226,30 @@ class MeSerializer(serializers.Serializer):
 from django.contrib.auth.password_validation import validate_password
 
 class MeUpdateSerializer(serializers.Serializer):
-    # user fields
-    first_name = serializers.CharField(required=False, allow_blank=True, max_length=150)
-    last_name = serializers.CharField(required=False, allow_blank=True, max_length=150)
+    # ✅ user fields
+    first_name = serializers.CharField(required=False, allow_blank=True)
+    middle_name = serializers.CharField(required=False, allow_blank=True)
+    last_name = serializers.CharField(required=False, allow_blank=True)
     email = serializers.EmailField(required=False, allow_blank=True)
 
-    # profile fields (optional, depending role)
-    current_level = serializers.CharField(required=False, allow_blank=True, max_length=50)
-    group_name = serializers.CharField(required=False, allow_blank=True, max_length=80)
-    speciality = serializers.CharField(required=False, allow_blank=True, max_length=12)
-    shifts = serializers.ListField(
-        child=serializers.CharField(),
-        required=False
-    )
+    # ✅ address
+    address_line1 = serializers.CharField(required=False, allow_blank=True)
+    address_line2 = serializers.CharField(required=False, allow_blank=True)
+    city = serializers.CharField(required=False, allow_blank=True)
+    province = serializers.CharField(required=False, allow_blank=True)
+    postal_code = serializers.CharField(required=False, allow_blank=True)
+    country = serializers.CharField(required=False, allow_blank=True)
+
+    # ✅ location
+    lat = serializers.DecimalField(required=False, max_digits=9, decimal_places=6)
+    lng = serializers.DecimalField(required=False, max_digits=9, decimal_places=6)
+
+    # ✅ role profile fields (tu avais déjà)
+    current_level = serializers.CharField(required=False, allow_blank=True)
+    group_name = serializers.CharField(required=False, allow_blank=True)
+    speciality = serializers.CharField(required=False, allow_blank=True)
+    shifts = serializers.CharField(required=False, allow_blank=True)  # attention au nom exact dans model
+
 
     def validate_shifts(self, value):
         allowed = {"morning", "afternoon", "night", "full_time"}

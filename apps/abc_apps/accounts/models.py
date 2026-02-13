@@ -2,6 +2,7 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from apps.common.models import TimeStampedModel
+from django.utils import timezone
 
 
 class User(AbstractUser):
@@ -12,8 +13,53 @@ class User(AbstractUser):
         ("principal", "Principal"),
         ("security", "Security"),
     ]
+
     email = models.EmailField(unique=True, blank=True, null=True)
     role = models.CharField(max_length=12, choices=ROLE_CHOICES, default="student")
+
+    # ✅ SA-friendly naming + compatible RDC
+    # prenom -> first_name (déjà existant)
+    # nom    -> last_name  (déjà existant)
+    # postnom -> middle_name (ajout)
+    middle_name = models.CharField(max_length=80, blank=True, null=True)
+
+    # ✅ Profile photo
+    profile_photo = models.ImageField(
+        upload_to="profiles/photos/",
+        blank=True,
+        null=True
+    )
+
+    # ✅ Address (South Africa friendly)
+    address_line1 = models.CharField(max_length=180, blank=True, null=True)
+    address_line2 = models.CharField(max_length=180, blank=True, null=True)
+    city = models.CharField(max_length=80, blank=True, null=True)
+    province = models.CharField(max_length=80, blank=True, null=True)  # Gauteng, KZN, etc.
+    postal_code = models.CharField(max_length=20, blank=True, null=True)
+    country = models.CharField(max_length=60, blank=True, null=True, default="South Africa")
+
+    # ✅ Last known GPS location (useful for attendance scan context)
+    lat = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True)
+    lng = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True)
+    location_updated_at = models.DateTimeField(blank=True, null=True)
+
+    def set_location(self, lat: float, lng: float):
+        self.lat = lat
+        self.lng = lng
+        self.location_updated_at = timezone.now()
+        self.save(update_fields=["lat", "lng", "location_updated_at"])
+
+    @property
+    def full_name_sa(self):
+        # SA style: First + Middle + Last
+        parts = [self.first_name, self.middle_name, self.last_name]
+        return " ".join([p for p in parts if p])
+
+    @property
+    def full_name_rdc(self):
+        # RDC style: Prenom + Postnom + Nom
+        parts = [self.first_name, self.middle_name, self.last_name]
+        return " ".join([p for p in parts if p])
 
     def __str__(self):
         return f"{self.username} ({self.role})"

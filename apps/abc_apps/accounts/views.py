@@ -1,6 +1,7 @@
 # =========================
 # apps/accounts/views.py
 # =========================
+from django.utils import timezone
 from django.db.models import Q
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -45,7 +46,7 @@ class AppTokenObtainPairView(TokenObtainPairView):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def me(request):
-    data = MeSerializer(request.user).data
+    data = MeSerializer(request.user, context={"request": request}).data
     return ok(data)
 
 
@@ -73,16 +74,23 @@ def me_update(request):
 
     u = request.user
 
-    # ✅ update user fields
-    if "first_name" in data:
-        u.first_name = data["first_name"]
-    if "last_name" in data:
-        u.last_name = data["last_name"]
-    if "email" in data:
-        u.email = data["email"]
+    # ✅ user basic
+    for f in [
+        "first_name", "middle_name", "last_name", "email",
+        "address_line1", "address_line2", "city", "province", "postal_code", "country",
+    ]:
+        if f in data:
+            setattr(u, f, data[f])
+
+    # ✅ lat/lng
+    if "lat" in data and "lng" in data:
+        u.lat = data["lat"]
+        u.lng = data["lng"]
+        u.location_updated_at = timezone.now()
+
     u.save()
 
-    # ✅ update profile based on role
+    # ✅ role profile based
     role = getattr(u, "role", "student")
 
     if role == "student" and hasattr(u, "student_profile"):
@@ -101,14 +109,15 @@ def me_update(request):
 
     elif role == "security" and hasattr(u, "security_profile"):
         sec = u.security_profile
+        # ton model = shift (singulier)
         if "shifts" in data:
-            sec.shifts = data["shifts"]
+            # si tu veux accepter "shifts" côté API
+            sec.shift = data["shifts"]
+        if "shift" in data:
+            sec.shift = data["shift"]
         sec.save()
 
-    # secretary/principal usually only update user basic fields
-
-    return ok(MeSerializer(u).data)
-
+    return ok(MeSerializer(u, context={"request": request}).data)
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])

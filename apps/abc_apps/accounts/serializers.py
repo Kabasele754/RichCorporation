@@ -115,6 +115,11 @@ class UpdateStudentLevelSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=StudentProfile.STATUS_CHOICES, required=False)
 
 
+class ArchiveStudentSerializer(serializers.Serializer):
+    student_id = serializers.IntegerField()
+    # exemple: "ARCHIVED" / "ACTIVE" selon tes STATUS_CHOICES
+    status = serializers.ChoiceField(choices=StudentProfile.STATUS_CHOICES)
+
 # -------------------------
 # JWT login serializer
 # -------------------------

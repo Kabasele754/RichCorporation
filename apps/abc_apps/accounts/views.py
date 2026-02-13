@@ -11,7 +11,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from apps.abc_apps.accounts.models import StudentProfile, TeacherProfile
-from apps.abc_apps.accounts.serializers import AppTokenObtainPairSerializer, ChangePasswordSerializer, LogoutSerializer, MeSerializer, MeUpdateSerializer, TeacherCreateSerializer, TeacherListSerializer, UserSerializer, StudentProfileSerializer, UpdateStudentLevelSerializer
+from apps.abc_apps.accounts.serializers import AppTokenObtainPairSerializer, ArchiveStudentSerializer, ChangePasswordSerializer, LogoutSerializer, MeSerializer, MeUpdateSerializer, TeacherCreateSerializer, TeacherListSerializer, UserSerializer, StudentProfileSerializer, UpdateStudentLevelSerializer
 from apps.abc_apps.accounts.permissions import IsSecretary, IsPrincipal
 from apps.common.permissions import IsStaffOrPrincipal
 from apps.common.responses import fail, ok
@@ -22,10 +22,25 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import AllowAny
 from rest_framework.parsers import JSONParser, FormParser, MultiPartParser
 from rest_framework import generics
+from rest_framework.pagination import PageNumberPagination
+
+
+def ok(data=None, message="OK", status=status.HTTP_200_OK):
+    return Response({"message": message, "data": data}, status=status)
+
+def bad(message="Bad request", status=status.HTTP_400_BAD_REQUEST):
+    return Response({"message": message}, status=status)
+
+
+class StudentPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = "page_size"
+    max_page_size = 100
 
 
 class AppTokenObtainPairView(TokenObtainPairView):
     serializer_class = AppTokenObtainPairSerializer
+  
     
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
@@ -127,20 +142,76 @@ class LogoutAPIView(generics.GenericAPIView):
             
 class SecretaryStudentAdminViewSet(ViewSet):
     permission_classes = [IsAuthenticated, (IsSecretary | IsPrincipal)]
+    pagination_class = StudentPagination
 
+    def get_queryset(self):
+        return StudentProfile.objects.select_related("user").order_by("-created_at")
+
+    # ✅ 1) LISTE DES STUDENTS
+    # GET /api/secretary/students/?level=L1&group=A&status=ACTIVE&search=paul&page=1&page_size=20
+    def list(self, request):
+        qs = self.get_queryset()
+
+        level = request.query_params.get("level")
+        group = request.query_params.get("group")
+        st = request.query_params.get("status")
+        search = request.query_params.get("search")
+
+        if level:
+            qs = qs.filter(current_level=level)
+        if group:
+            qs = qs.filter(group_name=group)
+        if st:
+            qs = qs.filter(status=st)
+
+        if search:
+            qs = qs.filter(
+                Q(user__first_name__icontains=search)
+                | Q(user__last_name__icontains=search)
+                | Q(user__email__icontains=search)
+                | Q(student_code__icontains=search)
+            )
+
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(qs, request)
+        data = StudentProfileSerializer(page, many=True).data
+        return paginator.get_paginated_response(data)
+
+    # ✅ 2) DETAIL (optionnel mais utile)
+    # GET /api/secretary/students/{id}/
+    def retrieve(self, request, pk=None):
+        sp = self.get_queryset().get(id=pk)
+        return ok(StudentProfileSerializer(sp).data)
+
+    # ✅ 3) UPDATE LEVEL (ton endpoint)
+    # PATCH /api/secretary/students/update_level/
     @action(detail=False, methods=["patch"])
     def update_level(self, request):
         ser = UpdateStudentLevelSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
 
-        sp = StudentProfile.objects.select_related("user").get(id=ser.validated_data["student_id"])
+        sp = self.get_queryset().get(id=ser.validated_data["student_id"])
         sp.current_level = ser.validated_data["current_level"]
         sp.group_name = ser.validated_data["group_name"]
         if "status" in ser.validated_data:
             sp.status = ser.validated_data["status"]
         sp.save()
+
         return ok(StudentProfileSerializer(sp).data, message="Student level updated", status=status.HTTP_200_OK)
-    
+
+    # ✅ 4) ARCHIVE / RESTORE
+    # PATCH /api/secretary/students/archive/
+    # body: {"student_id": 12, "status": "ARCHIVED"}
+    @action(detail=False, methods=["patch"])
+    def archive(self, request):
+        ser = ArchiveStudentSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+
+        sp = self.get_queryset().get(id=ser.validated_data["student_id"])
+        sp.status = ser.validated_data["status"]
+        sp.save()
+
+        return ok(StudentProfileSerializer(sp).data, message="Student status updated", status=status.HTTP_200_OK) 
 
 
 class SecretaryTeacherViewSet(ViewSet):

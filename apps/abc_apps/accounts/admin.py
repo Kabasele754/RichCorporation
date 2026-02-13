@@ -5,8 +5,8 @@ from django.contrib.auth import get_user_model
 from .models import StudentProfile, TeacherProfile, SecretaryProfile, PrincipalProfile, SecurityProfile, User
 
 
-
-@admin.register(User)
+admin.site.register(User)
+# @admin.register(User)
 # class UserAdmin(DjangoUserAdmin):
 #     fieldsets = DjangoUserAdmin.fieldsets + (
 #         ("ABC Role", {"fields": ("role",)}),

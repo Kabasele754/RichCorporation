@@ -70,7 +70,6 @@ class CourseSerializer(serializers.ModelSerializer):
 # StudentMonthlyEnrollment
 # ─────────────────────────────────────────────
 class StudentMonthlyEnrollmentSerializer(serializers.ModelSerializer):
-    # ----- Readable fields (read-only) -----
     period_key = serializers.CharField(source="period.key", read_only=True)
 
     student_full_name = serializers.CharField(source="student.user.get_full_name", read_only=True)
@@ -88,23 +87,18 @@ class StudentMonthlyEnrollmentSerializer(serializers.ModelSerializer):
             "student", "student_full_name", "student_code",
             "group", "group_label", "level_label", "room_code",
             "status",
+            "exam_unlock",   # ✅ NEW
             "created_at",
         ]
         read_only_fields = ["created_at"]
 
     def validate(self, attrs):
-        """
-        ✅ sécurité: le group doit appartenir à la même période
-        """
         period = attrs.get("period")
         group = attrs.get("group")
-
         if period and group and group.period_id != period.id:
-            raise serializers.ValidationError(
-                {"group": "This group does not belong to the selected period."}
-            )
-
+            raise serializers.ValidationError({"group": "This group does not belong to the selected period."})
         return attrs
+
 
 
 # ─────────────────────────────────────────────

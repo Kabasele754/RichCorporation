@@ -185,6 +185,8 @@ class StudentMonthlyEnrollment(TimeStampedModel):
         choices=[("pending", "Pending"), ("active", "Active"), ("inactive", "Inactive")],
         default="pending",
     )
+    # ✅ NEW: autorisation examen
+    exam_unlock = models.BooleanField(default=False)
 
     class Meta:
         unique_together = ("period", "student")

@@ -57,6 +57,9 @@ INSTALLED_APPS = [
     "apps.abc_apps.library.apps.LibraryConfig",
     "apps.abc_apps.dashboards.apps.DashboardsConfig",
     
+    # other apps can be added here
+    "apps.abc_apps.app_teacher.apps.AppTeacherConfig",
+    
     
     
 ]

@@ -18,6 +18,7 @@ urlpatterns = [
     path("api/academics/", include("apps.abc_apps.academics.urls")),
     path("api/sessions/", include("apps.abc_apps.sessions_abc.urls")),
     path("api/dashboards/", include("apps.abc_apps.dashboards.urls")),
+    path("api/teacher/", include("apps.abc_apps.app_teacher.urls")),
     # Frontend website
     path("", include("apps.website.urls")),
 ]

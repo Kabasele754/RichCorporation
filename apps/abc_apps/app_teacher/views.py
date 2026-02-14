@@ -133,110 +133,48 @@ class TeacherScheduleViewSet(ViewSet):
 # ---------------------------
 # 2) Teacher Classes + details (one shot)
 # ---------------------------
-class TeacherClassViewSet(ViewSet):
+class TeacherWeeklyPlanViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated, IsTeacher]
+    serializer_class = WeeklyTeachingPlanSerializer
+    queryset = WeeklyTeachingPlan.objects.all()
 
-    def list(self, request):
-        teacher = request.user.teacher_profile
+    def get_queryset(self):
+        teacher = self.request.user.teacher_profile
+        qs = super().get_queryset().filter(teacher=teacher)
 
-        qs = TeacherCourseAssignment.objects.select_related(
-            "monthly_group__level",
-            "monthly_group__room",
-            "period",
-            "course",
-        ).filter(
+        monthly_group = self.request.query_params.get("monthly_group")
+        week_start = self.request.query_params.get("week_start")
+
+        if monthly_group:
+            qs = qs.filter(monthly_group_id=monthly_group)
+        if week_start:
+            qs = qs.filter(week_start=week_start)
+
+        return qs.order_by("-week_start", "-created_at")
+
+    def perform_create(self, serializer):
+        teacher = self.request.user.teacher_profile
+
+        monthly_group = serializer.validated_data["monthly_group"]
+        course = serializer.validated_data["course"]
+
+        # ✅ week_start optionnel
+        raw_week = serializer.validated_data.get("week_start") or timezone.now().date()
+        week_start = monday_of(raw_week)
+
+        # ✅ IMPORTANT: ValueError -> ValidationError (sinon 500 HTML)
+        if not TeacherCourseAssignment.objects.filter(
             teacher=teacher,
-            monthly_group__isnull=False
-        ).order_by("-period__year", "-period__month")
+            monthly_group=monthly_group,
+            course=course
+        ).exists():
+            raise ValidationError({"detail": "Not assigned to this course/class."})
 
-        groups = {}
-        for a in qs:
-            g = a.monthly_group
-            if g.id not in groups:
-                groups[g.id] = {
-                    "id": g.id,
-                    "label": g.label,
-                    "period": a.period.key if a.period else None,
-                    "level": g.level.label,
-                    "group_name": g.group_name,
-                    "room": g.room.code,
-                    "is_active": g.is_active,
-                }
-
-        return ok(list(groups.values()))
-
-    @action(detail=True, methods=["get"])
-    def details(self, request, pk=None):
-        """
-        GET /api/teacher/classes/{group_id}/details/?week_start=YYYY-MM-DD
-        """
-        teacher = request.user.teacher_profile
-
-        if not TeacherCourseAssignment.objects.filter(teacher=teacher, monthly_group_id=pk).exists():
-            return bad("Not allowed", status_code=status.HTTP_403_FORBIDDEN)
-
-        week_start_str = request.query_params.get("week_start")
-        if week_start_str:
-            try:
-                week_start = monday_of(date.fromisoformat(week_start_str))
-            except ValueError:
-                return bad("week_start must be YYYY-MM-DD", status_code=status.HTTP_400_BAD_REQUEST)
-        else:
-            week_start = monday_of(date.today())
-
-        group = MonthlyClassGroup.objects.select_related("period", "level", "room").get(id=pk)
-
-        group_data = {
-            "id": group.id,
-            "label": group.label,
-            "period": group.period.key,
-            "level": group.level.label,
-            "group_name": group.group_name,
-            "room": group.room.code,
-            "is_active": group.is_active,
-        }
-
-        assignments = TeacherCourseAssignment.objects.select_related(
-            "teacher__user", "course", "classroom", "period", "monthly_group"
-        ).filter(teacher=teacher, monthly_group_id=pk)
-
-        courses_data = TeacherCourseAssignmentSerializer(assignments, many=True).data
-
-        enrolls = StudentMonthlyEnrollment.objects.select_related("student__user").filter(
-            group_id=pk, status="active"
-        ).order_by("student__user__first_name", "student__user__last_name")
-
-        students = [e.student for e in enrolls]
-        students_data = StudentMiniSerializer(students, many=True).data
-
-        course_ids = list(assignments.values_list("course_id", flat=True).distinct())
-
-        plans = WeeklyTeachingPlan.objects.filter(
+        serializer.save(
             teacher=teacher,
-            monthly_group_id=pk,
-            course_id__in=course_ids,
-            week_start=week_start,
-        ).select_related("course")
-
-        plan_by_course_id = {p.course_id: p for p in plans}
-
-        weekly_plans_data = []
-        for a in assignments:
-            p = plan_by_course_id.get(a.course_id)
-            weekly_plans_data.append({
-                "course_id": a.course_id,
-                "course_name": a.course.name,
-                "plan": WeeklyTeachingPlanSerializer(p).data if p else None,
-            })
-
-        return ok({
-            "group": group_data,
-            "week_start": week_start.isoformat(),
-            "courses": courses_data,
-            "students": students_data,
-            "weekly_plans": weekly_plans_data,
-        })
-
+            period=monthly_group.period,
+            week_start=week_start
+        )
 
 # ---------------------------
 # 3) Weekly plans CRUD

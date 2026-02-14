@@ -259,17 +259,18 @@ class TeacherWeeklyPlanViewSet(ModelViewSet):
 
         return qs.order_by("-week_start", "-created_at")
 
-    def perform_create(self, serializer):
-        teacher = self.request.user.teacher_profile
+    def create(self, request, *args, **kwargs):
+        teacher = request.user.teacher_profile
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
         monthly_group = serializer.validated_data["monthly_group"]
         course = serializer.validated_data["course"]
 
-        # ✅ week_start optionnel
         raw_week = serializer.validated_data.get("week_start") or timezone.now().date()
         week_start = monday_of(raw_week)
 
-        # ✅ IMPORTANT: ValueError -> ValidationError (sinon 500 HTML)
         if not TeacherCourseAssignment.objects.filter(
             teacher=teacher,
             monthly_group=monthly_group,
@@ -277,12 +278,28 @@ class TeacherWeeklyPlanViewSet(ModelViewSet):
         ).exists():
             raise ValidationError({"detail": "Not assigned to this course/class."})
 
-        serializer.save(
+        defaults = {
+            "period": monthly_group.period,
+            "monday": serializer.validated_data.get("monday", ""),
+            "tuesday": serializer.validated_data.get("tuesday", ""),
+            "wednesday": serializer.validated_data.get("wednesday", ""),
+            "thursday": serializer.validated_data.get("thursday", ""),
+            "friday": serializer.validated_data.get("friday", ""),
+            "saturday": serializer.validated_data.get("saturday", ""),
+            "sunday": serializer.validated_data.get("sunday", ""),
+        }
+
+        obj, created = WeeklyTeachingPlan.objects.update_or_create(
             teacher=teacher,
-            period=monthly_group.period,
-            week_start=week_start
+            monthly_group=monthly_group,
+            course=course,
+            week_start=week_start,
+            defaults=defaults,
         )
 
+        out = self.get_serializer(obj).data
+        code = status.HTTP_201_CREATED if created else status.HTTP_200_OK
+        return Response({"message": "Saved", "data": out, "created": created}, status=code)
 # ---------------------------
 # 4) QR Enrollment endpoint
 # ---------------------------

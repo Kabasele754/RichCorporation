@@ -3,10 +3,12 @@ from __future__ import annotations
 from datetime import date, timedelta
 import hmac
 import hashlib
+from django.utils import timezone
 
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Q
+from django.forms import ValidationError
 from rest_framework.viewsets import ViewSet, ModelViewSet
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -263,19 +265,22 @@ class TeacherWeeklyPlanViewSet(ModelViewSet):
 
         monthly_group = serializer.validated_data["monthly_group"]
         course = serializer.validated_data["course"]
-        week_start = monday_of(serializer.validated_data["week_start"])
+
+        # ✅ si week_start absent → aujourd'hui
+        raw_week = serializer.validated_data.get("week_start") or timezone.now().date()
+        week_start = monday_of(raw_week)
 
         if not TeacherCourseAssignment.objects.filter(
-            teacher=teacher,
-            monthly_group=monthly_group,
-            course=course
+                teacher=teacher,
+                monthly_group=monthly_group,
+                course=course
         ).exists():
-            raise ValueError("Not assigned to this course/class.")
+                raise ValidationError({"detail": "Not assigned to this course/class."})
 
         serializer.save(
-            teacher=teacher,
-            period=monthly_group.period,
-            week_start=week_start
+                teacher=teacher,
+                period=monthly_group.period,
+                week_start=week_start
         )
 
 

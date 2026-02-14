@@ -25,6 +25,7 @@ class WeeklyTeachingPlanSerializer(serializers.ModelSerializer):
     course_name = serializers.CharField(source="course.name", read_only=True)
     group_label = serializers.CharField(source="monthly_group.label", read_only=True)
     period_key = serializers.CharField(source="period.key", read_only=True)
+    week_start = serializers.DateField(required=False)
 
     class Meta:
         model = WeeklyTeachingPlan

@@ -199,12 +199,14 @@ class StudentMonthlyEnrollment(TimeStampedModel):
 # ✅ EXISTANT (modifié) : assignment teacher↔course
 class TeacherCourseAssignment(TimeStampedModel):
     teacher = models.ForeignKey(TeacherProfile, on_delete=models.CASCADE, related_name="course_assignments")
-    classroom = models.ForeignKey(ClassRoom, on_delete=models.CASCADE, related_name="teacher_assignments")
+    classroom = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="teacher_assignments")
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="teacher_assignments")
 
     is_titular = models.BooleanField(default=False)
     start_date = models.DateField()
     end_date = models.DateField(null=True, blank=True)
+    start_time = models.TimeField(null=True, blank=True)
+    end_time = models.TimeField(null=True, blank=True)
 
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
@@ -247,3 +249,7 @@ class MonthlyGoal(TimeStampedModel):
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="created_goals"
     )
+    
+    
+    
+    

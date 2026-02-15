@@ -337,59 +337,124 @@ class TeacherWeeklyPlanViewSet(ModelViewSet):
 # ---------------------------
 class TeacherQrEnrollmentViewSet(ViewSet):
     permission_classes = [IsAuthenticated, IsTeacher]
+    
+    @action(detail=False, methods=["get"])
+    def history(self, request):
+        teacher = request.user.teacher_profile
+
+        group_id = request.query_params.get("group_id")
+        period_key = request.query_params.get("period")      # ex "2026-02"
+        student_id = request.query_params.get("student_id")
+        status_ = request.query_params.get("status")
+        limit = int(request.query_params.get("limit", 50))
+
+        qs = StudentMonthlyEnrollment.objects.select_related(
+            "student__user",
+            "period",
+            "group__level",
+            "group__room",
+        ).all()
+
+        # ✅ (optionnel) filtrer seulement les classes du teacher
+        # Important: sinon un teacher peut voir enrollments d’autres classes
+        qs = qs.filter(
+            group__in=MonthlyClassGroup.objects.filter(
+                teachercourseassignment__teacher=teacher
+            )
+        )
+
+        if period_key:
+            qs = qs.filter(period__key=period_key)
+        if group_id:
+            qs = qs.filter(group_id=group_id)
+        if student_id:
+            qs = qs.filter(student_id=student_id)
+        if status_:
+            qs = qs.filter(status=status_)
+
+        qs = qs.order_by("-created_at")[:limit]
+
+        return ok(
+            data={
+                "items": StudentMonthlyEnrollmentSerializer(qs, many=True).data,
+                "count": qs.count() if limit >= 200 else None,
+            },
+            message="Enrollment history",
+        )
 
     @action(detail=False, methods=["post"])
     def enroll(self, request):
+        """
+        POST /api/teacher/enrollments/enroll/
+        body: {"group_id": 5, "qr_data": "...", "status":"active"}
+        """
         ser = EnrollByQrPayloadSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
 
         teacher = request.user.teacher_profile
-        group = MonthlyClassGroup.objects.select_related("period").get(
-            id=ser.validated_data["group_id"]
-        )
+        group_id = ser.validated_data["group_id"]
+        qr_data = ser.validated_data["qr_data"]
+        new_status = ser.validated_data.get("status", "active")
 
+        # ✅ group safe
+        try:
+            group = MonthlyClassGroup.objects.select_related("period", "level", "room").get(id=group_id)
+        except MonthlyClassGroup.DoesNotExist:
+            return bad("Invalid group_id", status_code=status.HTTP_400_BAD_REQUEST)
+
+        # ✅ permission
         if not TeacherCourseAssignment.objects.filter(teacher=teacher, monthly_group=group).exists():
             return bad("Not allowed", status_code=status.HTTP_403_FORBIDDEN)
 
+        # ✅ parse QR
         try:
-            parsed = parse_qr_data(ser.validated_data["qr_data"])
+            parsed = parse_qr_data(qr_data)
         except ValueError as e:
             return bad(str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
-        if parsed.get("student_id"):
-            student = StudentProfile.objects.select_related("user").get(id=parsed["student_id"])
-        else:
-            student = StudentProfile.objects.select_related("user").get(student_code=parsed["student_code"])
-
-        new_status = ser.validated_data.get("status", "active")
+        # ✅ student safe
+        try:
+            if parsed.get("student_id"):
+                student = StudentProfile.objects.select_related("user").get(id=parsed["student_id"])
+            else:
+                student = StudentProfile.objects.select_related("user").get(student_code=parsed["student_code"])
+        except StudentProfile.DoesNotExist:
+            return bad("Student not found", status_code=status.HTTP_404_NOT_FOUND)
 
         with transaction.atomic():
-            enrollment, created = StudentMonthlyEnrollment.objects.get_or_create(
+            # ✅ lock this enrollment row for this period/student
+            enrollment, created = StudentMonthlyEnrollment.objects.select_for_update().get_or_create(
                 period=group.period,
                 student=student,
                 defaults={"group": group, "status": new_status},
             )
 
             if not created:
-                # ✅ Déjà enrollé ce mois
+                # 🚫 déjà enrollé ce mois dans une autre classe -> 409
                 if enrollment.group_id != group.id:
-                    # 🚫 BLOQUER si autre classe
+                    # charger label du groupe existant (si pas déjà select_related)
+                    current_group = MonthlyClassGroup.objects.select_related("level", "room", "period").get(
+                        id=enrollment.group_id
+                    )
+
                     return bad(
-                        f"Student already enrolled in another class for {group.period.key}.",
+                        f"Student already enrolled in {current_group.label} for {group.period.key}.",
                         status_code=status.HTTP_409_CONFLICT,
                         data={
                             "period": group.period.key,
-                            "current_group_id": enrollment.group_id,
+                            "current_group_id": current_group.id,
+                            "current_group_label": current_group.label,
                             "requested_group_id": group.id,
+                            "requested_group_label": group.label,
                         },
                     )
 
-                # ✅ Même classe -> update status seulement
+                # ✅ même classe -> update status seulement si différent
                 if enrollment.status != new_status:
                     enrollment.status = new_status
                     enrollment.save(update_fields=["status"])
 
-        # Optionnel: sync StudentProfile quick fields
+        # ✅ Optionnel: sync quick fields
         student.current_level = group.level.label
         student.group_name = group.group_name
         student.save(update_fields=["current_level", "group_name"])
@@ -399,10 +464,12 @@ class TeacherQrEnrollmentViewSet(ViewSet):
                 "enrollment_id": enrollment.id,
                 "student_id": student.id,
                 "student_code": student.student_code,
-                "group_id": enrollment.group_id,   # ✅ valeur réelle enregistrée
+                "student_full_name": student.user.get_full_name() if getattr(student, "user", None) else "",
+                "group_id": enrollment.group_id,
+                "group_label": group.label,
                 "period": group.period.key,
                 "status": enrollment.status,
-                "qr_version": parsed["version"],
+                "qr_version": parsed.get("version"),
                 "created": created,
             },
             message="Student enrolled successfully",

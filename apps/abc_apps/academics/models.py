@@ -189,7 +189,7 @@ class StudentMonthlyEnrollment(TimeStampedModel):
     exam_unlock = models.BooleanField(default=False)
 
     class Meta:
-        unique_together = ("period", "student")
+        unique_together = ("period", "student", "group")
         indexes = [
             models.Index(fields=["period", "group"]),
             models.Index(fields=["student", "period"]),

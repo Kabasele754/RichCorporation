@@ -129,7 +129,7 @@ class StudentProofScan(models.Model):
         # ✅ règle anti-doublon (course peut être NULL)
         constraints = [
             models.UniqueConstraint(
-                fields=["period", "student", "course", "purpose"],
+                fields=["period", "student", "course", "purpose", "group"],
                 name="uniq_proofscan_period_student_course_purpose",
             )
         ]

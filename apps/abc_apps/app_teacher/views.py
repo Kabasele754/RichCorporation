@@ -16,6 +16,7 @@ from rest_framework import status
 
 # ✅ tes models existants (adapte les imports)
 from apps.abc_apps.academics.models import (
+    Course,
     TeacherCourseAssignment,
     MonthlyClassGroup,
     StudentMonthlyEnrollment,
@@ -527,92 +528,77 @@ class TeacherProofScanViewSet(ViewSet):
         meta = request.data.get("meta", {}) or {}
 
         if not group_id or not qr_data or not purpose:
-            return bad("group_id, qr_data, purpose are required", status_code=status.HTTP_400_BAD_REQUEST)
+            return bad("group_id, qr_data, purpose are required",
+                       status_code=status.HTTP_400_BAD_REQUEST)
 
-        group = MonthlyClassGroup.objects.select_related("period").get(id=group_id)
+        # ✅ group safe
+        try:
+            group = MonthlyClassGroup.objects.select_related("period").get(id=group_id)
+        except MonthlyClassGroup.DoesNotExist:
+            return bad("Invalid group_id", status_code=status.HTTP_400_BAD_REQUEST)
 
+        # ✅ permission
         if not TeacherCourseAssignment.objects.filter(teacher=teacher, monthly_group=group).exists():
             return bad("Not allowed", status_code=status.HTTP_403_FORBIDDEN)
 
+        # ✅ parse QR
         try:
             parsed = parse_qr_data(qr_data)
         except ValueError as e:
             return bad(str(e), status_code=status.HTTP_400_BAD_REQUEST)
 
-        if parsed.get("student_id"):
-            student = StudentProfile.objects.select_related("user").get(id=parsed["student_id"])
-        else:
-            student = StudentProfile.objects.select_related("user").get(student_code=parsed["student_code"])
+        # ✅ student safe
+        try:
+            if parsed.get("student_id"):
+                student = StudentProfile.objects.select_related("user").get(id=parsed["student_id"])
+            else:
+                student = StudentProfile.objects.select_related("user").get(student_code=parsed["student_code"])
+        except StudentProfile.DoesNotExist:
+            return bad("Student not found", status_code=status.HTTP_404_NOT_FOUND)
+
+        # ✅ course safe (si fourni)
+        course = None
+        if course_id:
+            course = Course.objects.filter(id=course_id).first()
+            if not course:
+                return bad("Invalid course", status_code=status.HTTP_400_BAD_REQUEST)
 
         with transaction.atomic():
-            # ✅ ensure enrollment exists for this period (NE PAS déplacer)
-            enrollment, created = StudentMonthlyEnrollment.objects.get_or_create(
+            # ✅ ensure enrollment exists for this period
+            enrollment, _ = StudentMonthlyEnrollment.objects.get_or_create(
                 period=group.period,
                 student=student,
                 defaults={"group": group, "status": "active"},
             )
 
-            if not created and enrollment.group_id != group.id:
-                return bad(
-                    f"Student already enrolled in another class for {group.period.key}.",
-                    status_code=status.HTTP_409_CONFLICT,
-                    data={
-                        "period": group.period.key,
-                        "current_group_id": enrollment.group_id,
-                        "requested_group_id": group.id,
-                    },
-                )
+            # ✅ align group
+            if enrollment.group_id != group.id:
+                enrollment.group = group
 
-            # ✅ Block duplicate proof scan (friendly check)
-            qs = StudentProofScan.objects.filter(
-                period=group.period,
-                student=student,
-                purpose=purpose,
-            )
-            if course_id:
-                qs = qs.filter(course_id=course_id)
-            else:
-                qs = qs.filter(course__isnull=True)
+            # ✅ unlock exam
+            if purpose == "exam_eligible":
+                enrollment.exam_unlock = True
+            enrollment.save()
 
-            if qs.exists():
-                return bad(
-                    "Student already scanned for this purpose (and course) this month.",
-                    status_code=status.HTTP_409_CONFLICT,
-                    data={
-                        "period": group.period.key,
-                        "purpose": purpose,
-                        "course_id": course_id,
-                    },
-                )
-
-            # ✅ save scan proof
+            # ✅ create scan with duplicate handling
             try:
                 scan = StudentProofScan.objects.create(
                     teacher=teacher,
                     period=group.period,
                     group=group,
                     student=student,
-                    course_id=course_id if course_id else None,
+                    course=course,
                     purpose=purpose,
                     note=note,
                     meta=meta,
                 )
             except IntegrityError:
-                # safety net (DB constraint)
+                # ✅ doublon → 409
+                course_label = course.name if course else "No course"
                 return bad(
-                    "Student already scanned for this purpose (and course) this month.",
+                    f"Already scanned this month for: {purpose} • {course_label}",
                     status_code=status.HTTP_409_CONFLICT,
-                    data={
-                        "period": group.period.key,
-                        "purpose": purpose,
-                        "course_id": course_id,
-                    },
                 )
-
-            # ✅ unlock exam when purpose is exam_eligible
-            if purpose == "exam_eligible" and enrollment.exam_unlock is not True:
-                enrollment.exam_unlock = True
-                enrollment.save(update_fields=["exam_unlock"])
 
         return ok(
             {

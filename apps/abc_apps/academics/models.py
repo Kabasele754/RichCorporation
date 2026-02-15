@@ -243,7 +243,7 @@ class MonthlyGoal(TimeStampedModel):
     goal_text = models.TextField()
 
     level = models.CharField(max_length=50, blank=True)
-    classroom = models.ForeignKey(ClassRoom, on_delete=models.CASCADE, null=True, blank=True, related_name="goals")
+    classroom = models.ForeignKey(Room, on_delete=models.CASCADE, null=True, blank=True, related_name="goals")
 
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,

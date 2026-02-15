@@ -57,6 +57,7 @@ def parse_qr_data(qr_data: str) -> dict:
     - ABC2:    ABC2|studentId|studentCode|validUntil|statusCode|sig  (HMAC)
     """
     parts = qr_data.split("|")
+    print("See part qr_dat", qr_data)
 
     # ABC1
     if len(parts) == 5 and parts[0] == "ABC1":

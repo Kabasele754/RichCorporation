@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.db.models import Q
 
 # ✅ Import tes models existants (adapte le chemin)
 from apps.abc_apps.academics.models import (
@@ -124,6 +125,20 @@ class StudentProofScan(models.Model):
             models.Index(fields=["period", "group"]),
             models.Index(fields=["student", "period"]),
             models.Index(fields=["teacher", "period"]),
+        ]
+        constraints = [
+            # ✅ course renseigné => un seul scan par (student, period, purpose, course)
+            models.UniqueConstraint(
+                fields=["student", "period", "purpose", "course"],
+                condition=Q(course__isnull=False),
+                name="uniq_proof_student_period_purpose_course",
+            ),
+            # ✅ course NULL => un seul scan par (student, period, purpose)
+            models.UniqueConstraint(
+                fields=["student", "period", "purpose"],
+                condition=Q(course__isnull=True),
+                name="uniq_proof_student_period_purpose_nocourse",
+            ),
         ]
 
     def __str__(self):

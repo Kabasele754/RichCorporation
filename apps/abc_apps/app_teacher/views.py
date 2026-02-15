@@ -5,7 +5,7 @@ import hmac
 import hashlib
 
 from django.conf import settings
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.forms import ValidationError
 from rest_framework.viewsets import ViewSet, ModelViewSet
@@ -55,11 +55,42 @@ def parse_qr_data(qr_data: str) -> dict:
     - LEGACY: fullName|studentCode|level|groupName|validUntil|statusCode
     - ABC1:    ABC1|studentId|studentCode|validUntil|statusCode
     - ABC2:    ABC2|studentId|studentCode|validUntil|statusCode|sig  (HMAC)
+    - ABCSTU:  ABCSTU:studentCode|studentId?
+    - CODE:    studentCode only
     """
-    parts = qr_data.split("|")
-    print("See part qr_dat", qr_data)
+    s = (qr_data or "").strip()
+    if not s:
+        raise ValueError("Empty QR data")
 
-    # ABC1
+    # ✅ ABCSTU:ST-001|123
+    if s.startswith("ABCSTU:"):
+        payload = s.replace("ABCSTU:", "", 1)
+        parts = payload.split("|")
+        student_code = parts[0].strip()
+        student_id = int(parts[1]) if len(parts) >= 2 and parts[1].strip().isdigit() else None
+        if not student_code:
+            raise ValueError("Invalid student_code")
+        return {
+            "version": "ABCSTU",
+            "student_id": student_id,
+            "student_code": student_code,
+            "valid_until": None,
+            "status_code": None,
+        }
+
+    # ✅ CODE ONLY: ST-001
+    if "|" not in s:
+        return {
+            "version": "CODE",
+            "student_id": None,
+            "student_code": s,
+            "valid_until": None,
+            "status_code": None,
+        }
+
+    parts = s.split("|")
+
+    # ✅ ABC1
     if len(parts) == 5 and parts[0] == "ABC1":
         _, student_id, student_code, valid_until, status_code = parts
         return {
@@ -70,7 +101,7 @@ def parse_qr_data(qr_data: str) -> dict:
             "status_code": status_code.strip().lower(),
         }
 
-    # ABC2 (signed)
+    # ✅ ABC2 (signed)
     if len(parts) == 6 and parts[0] == "ABC2":
         _, student_id, student_code, valid_until, status_code, sig = parts
         payload = f"{student_id}|{student_code}|{valid_until}|{status_code}".encode()
@@ -92,7 +123,7 @@ def parse_qr_data(qr_data: str) -> dict:
             "status_code": status_code.strip().lower(),
         }
 
-    # LEGACY
+    # ✅ LEGACY
     if len(parts) == 6:
         full_name, student_code, level, group_name, valid_until, status_code = parts
         return {
@@ -104,7 +135,6 @@ def parse_qr_data(qr_data: str) -> dict:
         }
 
     raise ValueError("Unsupported QR format")
-
 
 # ---------------------------
 # 1) Teacher Schedule
@@ -309,15 +339,13 @@ class TeacherQrEnrollmentViewSet(ViewSet):
 
     @action(detail=False, methods=["post"])
     def enroll(self, request):
-        """
-        POST /api/teacher/enrollments/enroll/
-        body: {"group_id": 5, "qr_data": "...", "status":"active"}
-        """
         ser = EnrollByQrPayloadSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
 
         teacher = request.user.teacher_profile
-        group = MonthlyClassGroup.objects.select_related("period").get(id=ser.validated_data["group_id"])
+        group = MonthlyClassGroup.objects.select_related("period").get(
+            id=ser.validated_data["group_id"]
+        )
 
         if not TeacherCourseAssignment.objects.filter(teacher=teacher, monthly_group=group).exists():
             return bad("Not allowed", status_code=status.HTTP_403_FORBIDDEN)
@@ -332,16 +360,33 @@ class TeacherQrEnrollmentViewSet(ViewSet):
         else:
             student = StudentProfile.objects.select_related("user").get(student_code=parsed["student_code"])
 
+        new_status = ser.validated_data.get("status", "active")
+
         with transaction.atomic():
             enrollment, created = StudentMonthlyEnrollment.objects.get_or_create(
                 period=group.period,
                 student=student,
-                defaults={"group": group, "status": ser.validated_data.get("status", "active")},
+                defaults={"group": group, "status": new_status},
             )
+
             if not created:
-                enrollment.group = group
-                enrollment.status = ser.validated_data.get("status", enrollment.status)
-                enrollment.save()
+                # ✅ Déjà enrollé ce mois
+                if enrollment.group_id != group.id:
+                    # 🚫 BLOQUER si autre classe
+                    return bad(
+                        f"Student already enrolled in another class for {group.period.key}.",
+                        status_code=status.HTTP_409_CONFLICT,
+                        data={
+                            "period": group.period.key,
+                            "current_group_id": enrollment.group_id,
+                            "requested_group_id": group.id,
+                        },
+                    )
+
+                # ✅ Même classe -> update status seulement
+                if enrollment.status != new_status:
+                    enrollment.status = new_status
+                    enrollment.save(update_fields=["status"])
 
         # Optionnel: sync StudentProfile quick fields
         student.current_level = group.level.label
@@ -353,14 +398,14 @@ class TeacherQrEnrollmentViewSet(ViewSet):
                 "enrollment_id": enrollment.id,
                 "student_id": student.id,
                 "student_code": student.student_code,
-                "group_id": group.id,
+                "group_id": enrollment.group_id,   # ✅ valeur réelle enregistrée
                 "period": group.period.key,
                 "status": enrollment.status,
                 "qr_version": parsed["version"],
+                "created": created,
             },
             message="Student enrolled successfully",
         )
-
 
 # ---------------------------
 # 5) Homework CRUD + submissions view
@@ -433,6 +478,42 @@ class TeacherHomeworkSubmissionViewSet(ModelViewSet):
 
 class TeacherProofScanViewSet(ViewSet):
     permission_classes = [IsAuthenticated, IsTeacher]
+    
+    @action(detail=False, methods=["get"])
+    def history(self, request):
+        teacher = request.user.teacher_profile
+
+        group_id = request.query_params.get("group_id")
+        period_key = request.query_params.get("period")  # ex "2026-02"
+        student_id = request.query_params.get("student_id")
+        course_id = request.query_params.get("course")
+        purpose = request.query_params.get("purpose")
+        limit = int(request.query_params.get("limit", 50))
+
+        qs = StudentProofScan.objects.select_related(
+            "student__user", "group", "period", "course"
+        ).filter(teacher=teacher)
+
+        if period_key:
+            qs = qs.filter(period__key=period_key)
+        if group_id:
+            qs = qs.filter(group_id=group_id)
+        if student_id:
+            qs = qs.filter(student_id=student_id)
+        if course_id:
+            qs = qs.filter(course_id=course_id)
+        if purpose:
+            qs = qs.filter(purpose=purpose)
+
+        qs = qs.order_by("-scanned_at")[:limit]
+
+        return ok(
+            data={
+                "items": StudentProofScanSerializer(qs, many=True).data,
+                "count": qs.count() if limit >= 200 else None,
+            },
+            message="Scan history",
+        )
 
     @action(detail=False, methods=["post"])
     def scan(self, request):
@@ -464,34 +545,74 @@ class TeacherProofScanViewSet(ViewSet):
             student = StudentProfile.objects.select_related("user").get(student_code=parsed["student_code"])
 
         with transaction.atomic():
-            # ✅ save scan proof
-            scan = StudentProofScan.objects.create(
-                teacher=teacher,
-                period=group.period,
-                group=group,
-                student=student,
-                course_id=course_id if course_id else None,
-                purpose=purpose,
-                note=note,
-                meta=meta,
-            )
-
-            # ✅ ensure enrollment exists for this period
-            enrollment, _ = StudentMonthlyEnrollment.objects.get_or_create(
+            # ✅ ensure enrollment exists for this period (NE PAS déplacer)
+            enrollment, created = StudentMonthlyEnrollment.objects.get_or_create(
                 period=group.period,
                 student=student,
                 defaults={"group": group, "status": "active"},
             )
 
-            # ✅ keep group aligned
-            if enrollment.group_id != group.id:
-                enrollment.group = group
+            if not created and enrollment.group_id != group.id:
+                return bad(
+                    f"Student already enrolled in another class for {group.period.key}.",
+                    status_code=status.HTTP_409_CONFLICT,
+                    data={
+                        "period": group.period.key,
+                        "current_group_id": enrollment.group_id,
+                        "requested_group_id": group.id,
+                    },
+                )
+
+            # ✅ Block duplicate proof scan (friendly check)
+            qs = StudentProofScan.objects.filter(
+                period=group.period,
+                student=student,
+                purpose=purpose,
+            )
+            if course_id:
+                qs = qs.filter(course_id=course_id)
+            else:
+                qs = qs.filter(course__isnull=True)
+
+            if qs.exists():
+                return bad(
+                    "Student already scanned for this purpose (and course) this month.",
+                    status_code=status.HTTP_409_CONFLICT,
+                    data={
+                        "period": group.period.key,
+                        "purpose": purpose,
+                        "course_id": course_id,
+                    },
+                )
+
+            # ✅ save scan proof
+            try:
+                scan = StudentProofScan.objects.create(
+                    teacher=teacher,
+                    period=group.period,
+                    group=group,
+                    student=student,
+                    course_id=course_id if course_id else None,
+                    purpose=purpose,
+                    note=note,
+                    meta=meta,
+                )
+            except IntegrityError:
+                # safety net (DB constraint)
+                return bad(
+                    "Student already scanned for this purpose (and course) this month.",
+                    status_code=status.HTTP_409_CONFLICT,
+                    data={
+                        "period": group.period.key,
+                        "purpose": purpose,
+                        "course_id": course_id,
+                    },
+                )
 
             # ✅ unlock exam when purpose is exam_eligible
-            if purpose == "exam_eligible":
+            if purpose == "exam_eligible" and enrollment.exam_unlock is not True:
                 enrollment.exam_unlock = True
-
-            enrollment.save()
+                enrollment.save(update_fields=["exam_unlock"])
 
         return ok(
             {
@@ -500,7 +621,6 @@ class TeacherProofScanViewSet(ViewSet):
             },
             message="Proof scan saved",
         )
-
 class TeacherStudentRemarkViewSet(ModelViewSet):
     """
     CRUD remarks:

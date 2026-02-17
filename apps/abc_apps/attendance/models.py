@@ -42,7 +42,8 @@ class DailyRoomCheckIn(TimeStampedModel):
 
     class Meta:
         constraints = [
-            UniqueConstraint(fields=["date", "room", "student"], name="uniq_checkin_date_room_student"),
+            UniqueConstraint(fields=["period", "date", "room", "student"], name="uniq_checkin_period_date_room_student")
+
         ]
         indexes = [
             models.Index(fields=["period", "date", "room"]),

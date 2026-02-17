@@ -1,7 +1,7 @@
 # apps/attendance/views.py
 from datetime import date
 from datetime import timedelta
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework.viewsets import ViewSet
 from rest_framework.decorators import action
@@ -24,75 +24,71 @@ class StudentAttendanceViewSet(ViewSet):
     @action(detail=False, methods=["post"])
     def room_scan(self, request):
         """
-        POST /api/student/attendance/scan-door/
-        body: { "qr_data": "GROUP:12" }
+        POST /api/student/attendance/room_scan/
+        body: { "qr_data": "GROUP:12" }  (QR statique sur la porte)
         """
         student = request.user.student_profile
-        qr_data = request.data.get("qr_data")
-        print("avant ", qr_data)
+        qr_data = (request.data.get("qr_data") or "").strip()
+        if not qr_data:
+            return bad("qr_data is required", status_code=400)
 
+        # 1) Parse QR
         try:
             parsed = parse_group_qr(qr_data)
         except ValueError as e:
             return bad(str(e), status_code=400)
 
-        group = MonthlyClassGroup.objects.select_related("period", "room").filter(id=parsed["group_id"]).first()
+        group_id = parsed.get("group_id")
+        group = MonthlyClassGroup.objects.select_related("period", "room").filter(id=group_id).first()
         if not group:
             return bad("Invalid group", status_code=400)
 
         today = timezone.localdate()
 
-        # ✅ l’étudiant doit être enrollé dans CE group / CE period
+        # 2) Vérifier enrollment (dans ce group et ce period)
         enrollment = StudentMonthlyEnrollment.objects.filter(
             period=group.period,
             student=student,
             group=group,
-            status__in=["active", "pending"],  # tu peux limiter à active seulement si tu veux
+            status__in=["active", "pending"],  # mets ["active"] si tu veux strict
         ).first()
         if not enrollment:
             return bad("Not enrolled in this class group for this period.", status_code=403)
 
-        with transaction.atomic():
-            checkin, created = DailyRoomCheckIn.objects.get_or_create(
-                period=group.period,
-                date=today,
-                monthly_group=group,
-                room=group.room,
-                student=student,
-                defaults={
-                    "scanned_at": timezone.now(),
-                    "status": "present",
-                    "scanned_by": "self_scan",
-                    "required_confirmations": 3,
-                }
+        # 3) Sauver checkin (✅ lookup = unique constraint)
+        try:
+            with transaction.atomic():
+                checkin, created = DailyRoomCheckIn.objects.update_or_create(
+                    date=today,
+                    room=group.room,
+                    student=student,
+                    defaults={
+                        "period": group.period,
+                        "monthly_group": group,
+                        "scanned_at": timezone.now(),
+                        "status": "present",
+                        "scanned_by": "self_scan",
+                        "required_confirmations": 3,
+                    },
+                )
+        except IntegrityError:
+            # Au cas où concurrence (double scan très rapide)
+            checkin = DailyRoomCheckIn.objects.filter(date=today, room=group.room, student=student).first()
+            return ok(
+                {"checkin": DailyRoomCheckInSerializer(checkin).data, "created": False},
+                message="Already scanned today ✅",
             )
-
-            if not created:
-                # update scanned_at to latest scan if you want
-                checkin.scanned_at = timezone.now()
-                checkin.save(update_fields=["scanned_at"])
+        except Exception as e:
+            return bad(f"Server error: {str(e)}", status_code=500)
 
         return ok(
-            data={
+            {
                 "checkin": DailyRoomCheckInSerializer(checkin).data,
                 "created": created,
-                "qr_version": parsed["version"],
+                "qr_version": parsed.get("version"),
             },
-            message="Check-in saved ✅"
+            message="Check-in saved ✅",
         )
-
-    @action(detail=False, methods=["get"])
-    def my_today(self, request):
-        student = request.user.student_profile
-        today = timezone.localdate()
-
-        qs = DailyRoomCheckIn.objects.select_related("period", "monthly_group", "room", "student__user")\
-            .prefetch_related("approvals", "approvals__teacher__user")\
-            .filter(student=student, date=today)\
-            .order_by("-scanned_at")
-
-        return ok({"items": DailyRoomCheckInSerializer(qs, many=True).data}, "My today check-ins")
-
 
 class TeacherAttendanceConfirmViewSet(ViewSet):
     permission_classes = [IsAuthenticated, IsTeacher]

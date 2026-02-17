@@ -92,6 +92,8 @@ class StudentRemarkSerializer(serializers.ModelSerializer):
     period_key = serializers.CharField(source="period.key", read_only=True)
     group_label = serializers.CharField(source="group.label", read_only=True)
     course_name = serializers.CharField(source="course.name", read_only=True)
+    teacher_name = serializers.CharField(source="teacher.user.get_full_name", read_only=True)
+
 
     class Meta:
         model = StudentRemark

@@ -2,7 +2,7 @@ from __future__ import annotations
 from datetime import date
 from rest_framework.viewsets import ViewSet
 from rest_framework.permissions import IsAuthenticated
-
+from django.db.models import Q
 
 from apps.abc_apps.academics.models import StudentMonthlyEnrollment, TeacherCourseAssignment
 from apps.abc_apps.academics.serializers import (
@@ -142,10 +142,31 @@ class StudentRemarksViewSet(ViewSet):
     permission_classes = [IsAuthenticated, IsStudent]
 
     def list(self, request):
+        """
+        GET /api/student/remarks/?period=2026-02&course=ID&teacher=ID&q=keyword&limit=100
+        """
         student = request.user.student_profile
-        current = StudentMonthlyEnrollment.objects.select_related("group", "period").filter(
-            student=student
-        ).order_by("-period__year", "-period__month").first()
+
+        # ✅ optional filters
+        period_key = request.query_params.get("period")     # "2026-02" (si tu utilises code)
+        course_id = request.query_params.get("course")      # int
+        teacher_id = request.query_params.get("teacher")    # int
+        q = (request.query_params.get("q") or "").strip()
+        limit = int(request.query_params.get("limit", 100))
+
+        # ✅ récupérer enrollment courant (ou selon period)
+        enroll_qs = StudentMonthlyEnrollment.objects.select_related(
+            "group", "period"
+        ).filter(student=student)
+
+        if period_key:
+            # ⚠️ selon ton modèle AcademicPeriod:
+            # - si tu utilises "code" => period__code=period_key
+            # - si tu utilises "key"  => period__key=period_key
+            enroll_qs = enroll_qs.filter(period__code=period_key)
+
+        current = enroll_qs.order_by("-period__year", "-period__month").first()
+
         if not current:
             return bad("No enrollment", status_code=403)
 
@@ -153,10 +174,27 @@ class StudentRemarksViewSet(ViewSet):
             student=student,
             group=current.group,
             period=current.period,
-        ).order_by("-created_at")
+        )
 
-        return ok({"items": StudentRemarkSerializer(qs, many=True).data}, message="Remarks")
+        # ✅ server filters
+        if course_id:
+            qs = qs.filter(course_id=course_id)
 
+        if teacher_id:
+            qs = qs.filter(teacher_id=teacher_id)
+
+        if q:
+            # recherche sur title + remark (adapte si tes champs s'appellent autrement)
+            qs = qs.filter(
+                Q(title__icontains=q) | Q(remark__icontains=q)
+            )
+
+        qs = qs.select_related("course", "teacher__user").order_by("-created_at")[:limit]
+
+        return ok(
+            {"items": StudentRemarkSerializer(qs, many=True).data},
+            message="Remarks",
+        )
 
 class StudentProofScansViewSet(ViewSet):
     permission_classes = [IsAuthenticated, IsStudent]

@@ -33,7 +33,6 @@ class StudentAttendanceViewSet(ViewSet):
 
         try:
             parsed = parse_group_qr(qr_data)
-            print("apres ", parsed)
         except ValueError as e:
             return bad(str(e), status_code=400)
 

@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     
     # other apps can be added here
     "apps.abc_apps.app_teacher.apps.AppTeacherConfig",
+    "apps.abc_apps.students.apps.StudentsConfig",
     
     
     

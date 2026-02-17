@@ -6,7 +6,7 @@ from datetime import date
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from django.db import models
-from apps.common.models import TimeStampedModel, month_validator
+from apps.abc_apps.commons.models import TimeStampedModel, month_validator
 
 from apps.abc_apps.accounts.models import StudentProfile, TeacherProfile
 

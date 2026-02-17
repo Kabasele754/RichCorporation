@@ -23,6 +23,8 @@ from apps.abc_apps.academics.models import (
     StudentProfile,
 )
 from apps.abc_apps.academics.serializers import StudentMonthlyEnrollmentSerializer, TeacherCourseAssignmentSerializer
+from apps.abc_apps.accounts.views import bad
+from apps.abc_apps.commons.responses import ok
 from apps.common.permissions import IsTeacher
 
 from .models import ClassGeneralRemark, StudentMonthlyObjective, StudentProofScan, StudentRemark, WeeklyTeachingPlan, Homework, HomeworkSubmission
@@ -41,11 +43,11 @@ from .serializers import (
 # ---------------------------
 # Helpers
 # ---------------------------
-def ok(data=None, message="OK", status_code=status.HTTP_200_OK):
-    return Response({"message": message, "data": data}, status=status_code)
+# def ok(data=None, message="OK", status_code=status.HTTP_200_OK):
+#     return Response({"message": message, "data": data}, status=status_code)
 
-def bad(message="Bad request", status_code=status.HTTP_400_BAD_REQUEST):
-    return Response({"message": message}, status=status_code)
+# def bad(message="Bad request", status_code=status.HTTP_400_BAD_REQUEST):
+#     return Response({"message": message}, status=status_code)
 
 def monday_of(d: date) -> date:
     return d - timedelta(days=d.weekday())

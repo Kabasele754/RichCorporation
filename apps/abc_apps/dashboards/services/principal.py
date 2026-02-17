@@ -7,7 +7,7 @@ from apps.abc_apps.dashboards.services.utils import last_n_days_dates, weekday_l
 
 # Core modules
 from apps.abc_apps.sessions_abc.models import ClassSession
-from apps.abc_apps.attendance.models import StudentAttendance, TeacherCheckIn
+from apps.abc_apps.attendance.models import DailyRoomCheckIn, TeacherCheckIn
 from apps.abc_apps.gate_security.models import GateEntry
 from apps.abc_apps.library.models import Loan
 from apps.abc_apps.speeches.models import Speech
@@ -21,7 +21,7 @@ def build_principal_overview(user, days: int = 7):
 
     # --- KPIs ---
     students_present_today = (
-        StudentAttendance.objects
+        DailyRoomCheckIn.objects
         .filter(session__date=today)
         .values("student_id")
         .distinct()
@@ -56,7 +56,7 @@ def build_principal_overview(user, days: int = 7):
     present_series = []
     for d in dates:
         c = (
-            StudentAttendance.objects
+            DailyRoomCheckIn.objects
             .filter(session__date=d)
             .values("student_id")
             .distinct()
@@ -69,7 +69,7 @@ def build_principal_overview(user, days: int = 7):
     sessions_today = ClassSession.objects.select_related("classroom").filter(date=today).order_by("classroom__level", "classroom__group_name")
     for s in sessions_today:
         present = (
-            StudentAttendance.objects
+            DailyRoomCheckIn.objects
             .filter(session=s)
             .values("student_id")
             .distinct()

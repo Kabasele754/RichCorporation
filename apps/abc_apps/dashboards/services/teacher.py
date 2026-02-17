@@ -5,7 +5,7 @@ from django.utils import timezone
 from apps.abc_apps.dashboards.services.utils import today_date, now_dt
 
 from apps.abc_apps.sessions_abc.models import ClassSession, SessionTeacher
-from apps.abc_apps.attendance.models import StudentAttendance
+from apps.abc_apps.attendance.models import DailyRoomCheckIn
 from apps.abc_apps.library.models import Loan
 from apps.abc_apps.speeches.models import Speech
 
@@ -34,7 +34,7 @@ def build_teacher_overview(user):
     # Attendance counts for first session (or current)
     session_cards = []
     for s in sessions[:6]:
-        present = StudentAttendance.objects.filter(session=s).values("student_id").distinct().count()
+        present = DailyRoomCheckIn.objects.filter(session=s).values("student_id").distinct().count()
         session_cards.append({
             "session_id": s.id,
             "class": f"{s.classroom.level}-{s.classroom.group_name}",

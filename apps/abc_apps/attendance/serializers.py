@@ -1,50 +1,84 @@
-# =========================
 # apps/attendance/serializers.py
-# =========================
 from rest_framework import serializers
-from apps.abc_apps.attendance.models import CourseAttendance, StudentAttendance, TeacherCheckIn, AttendanceConfirmation
+from .models import DailyRoomCheckIn, DailyRoomCheckInApproval, StudentExamEntry, ReenrollmentIntent
 
-class StudentAttendanceSerializer(serializers.ModelSerializer):
+
+class DailyRoomCheckInApprovalSerializer(serializers.ModelSerializer):
+    teacher_name = serializers.CharField(source="teacher.user.get_full_name", read_only=True)
+    teacher_code = serializers.CharField(source="teacher.teacher_code", read_only=True, default="")
+
     class Meta:
-        model = StudentAttendance
-        fields = "__all__"
+        model = DailyRoomCheckInApproval
+        fields = ["id", "teacher", "teacher_name", "teacher_code", "approved", "note", "decided_at", "created_at"]
 
-class TeacherCheckInSerializer(serializers.ModelSerializer):
+
+class DailyRoomCheckInSerializer(serializers.ModelSerializer):
+    period_key = serializers.CharField(source="period.key", read_only=True)
+    room_code = serializers.CharField(source="room.code", read_only=True)
+    group_label = serializers.CharField(source="monthly_group.label", read_only=True)
+
+    student_full_name = serializers.CharField(source="student.user.get_full_name", read_only=True)
+    student_code = serializers.CharField(source="student.student_code", read_only=True, default="")
+
+    approvals_count = serializers.IntegerField(read_only=True)
+    is_fully_confirmed = serializers.BooleanField(read_only=True)
+    approvals = DailyRoomCheckInApprovalSerializer(many=True, read_only=True)
+
     class Meta:
-        model = TeacherCheckIn
-        fields = "__all__"
+        model = DailyRoomCheckIn
+        fields = [
+            "id",
+            "period", "period_key",
+            "date",
+            "room", "room_code",
+            "monthly_group", "group_label",
+            "student", "student_full_name", "student_code",
+            "scanned_at", "status", "scanned_by",
+            "required_confirmations",
+            "approvals_count", "is_fully_confirmed",
+            "approvals",
+            "created_at",
+        ]
 
-class AttendanceConfirmationSerializer(serializers.ModelSerializer):
+class StudentExamEntrySerializer(serializers.ModelSerializer):
+    period_key = serializers.CharField(source="period.key", read_only=True)
+    group_label = serializers.CharField(source="monthly_group.label", read_only=True)
+    room_code = serializers.CharField(source="room.code", read_only=True)
+
+    student_full_name = serializers.CharField(source="student.user.get_full_name", read_only=True)
+    student_code = serializers.CharField(source="student.student_code", read_only=True, default="")
+
     class Meta:
-        model = AttendanceConfirmation
-        fields = "__all__"
+        model = StudentExamEntry
+        fields = [
+            "id",
+            "period", "period_key",
+            "date",
+            "monthly_group", "group_label",
+            "room", "room_code",
+            "student", "student_full_name", "student_code",
+            "course_id",
+            "scanned_at",
+            "created_at",
+        ]
 
-class StudentScanSerializer(serializers.Serializer):
-    qr_payload = serializers.CharField(max_length=255)
 
-class TeacherScanSerializer(serializers.Serializer):
-    qr_payload = serializers.CharField(max_length=255)
+class ReenrollmentIntentSerializer(serializers.ModelSerializer):
+    from_period_key = serializers.CharField(source="from_period.key", read_only=True)
+    to_period_key = serializers.CharField(source="to_period.key", read_only=True)
+    student_full_name = serializers.CharField(source="student.user.get_full_name", read_only=True)
+    student_code = serializers.CharField(source="student.student_code", read_only=True, default="")
 
-class ConfirmSerializer(serializers.Serializer):
-    session_id = serializers.IntegerField()
-    notes = serializers.CharField(required=False, allow_blank=True)
-
-
-# new serializers for daily room check-in and course attendance can be added here as needed
-class RoomScanSerializer(serializers.Serializer):
-    qr_payload = serializers.CharField()
-
-class TeacherConfirmSerializer(serializers.Serializer):
-    assignment_id = serializers.IntegerField()
-    student_id = serializers.IntegerField()
-    date = serializers.DateField(required=False)
-    status = serializers.ChoiceField(choices=[c[0] for c in CourseAttendance.STATUS], default="present")
-    note = serializers.CharField(required=False, allow_blank=True)
-
-class ReenrollIntentCreateSerializer(serializers.Serializer):
-    will_return = serializers.BooleanField()
-    reason = serializers.CharField(required=False, allow_blank=True)
-
-class ReenrollDecisionSerializer(serializers.Serializer):
-    intent_id = serializers.IntegerField()
-    decision = serializers.ChoiceField(choices=["approved", "rejected"])
+    class Meta:
+        model = ReenrollmentIntent
+        fields = [
+            "id",
+            "student", "student_full_name", "student_code",
+            "from_period", "from_period_key",
+            "to_period", "to_period_key",
+            "will_return", "reason",
+            "status",
+            "decided_by", "decided_at",
+            "created_at",
+        ]
+        read_only_fields = ["status", "decided_by", "decided_at", "created_at"]

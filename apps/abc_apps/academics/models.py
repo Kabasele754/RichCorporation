@@ -6,6 +6,8 @@ from datetime import date
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from django.db import models
+from django.db.models import Q
+from django.core.exceptions import ValidationError
 from apps.abc_apps.commons.models import TimeStampedModel, month_validator
 
 from apps.abc_apps.accounts.models import StudentProfile, TeacherProfile
@@ -203,8 +205,11 @@ class TeacherCourseAssignment(TimeStampedModel):
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="teacher_assignments")
 
     is_titular = models.BooleanField(default=False)
+
     start_date = models.DateField()
     end_date = models.DateField(null=True, blank=True)
+
+    # ✅ NEW
     start_time = models.TimeField(null=True, blank=True)
     end_time = models.TimeField(null=True, blank=True)
 
@@ -213,7 +218,6 @@ class TeacherCourseAssignment(TimeStampedModel):
         related_name="created_course_assignments"
     )
 
-    # ✅ NOUVEAU : utilisé par le nouveau système (non obligatoire au début)
     period = models.ForeignKey(
         AcademicPeriod, on_delete=models.PROTECT,
         null=True, blank=True, related_name="teacher_assignments"
@@ -223,20 +227,29 @@ class TeacherCourseAssignment(TimeStampedModel):
         null=True, blank=True, related_name="teacher_assignments"
     )
 
-    # class Meta:
-    #     indexes = [
-    #         models.Index(fields=["teacher", "classroom"]),
-    #         models.Index(fields=["classroom", "course"]),
-    #         models.Index(fields=["period", "teacher"]),
-    #         models.Index(fields=["period", "monthly_group"]),
-    #     ]
+    class Meta:
+        indexes = [
+            models.Index(fields=["period", "monthly_group"]),
+            models.Index(fields=["period", "teacher"]),
+            models.Index(fields=["teacher", "start_date"]),
+            models.Index(fields=["classroom", "start_date"]),
+        ]
+        # ⚠️ DB-level constraints for titular uniqueness (safe + strong)
+        constraints = [
+            # ✅ 1 titulaire max par (period, monthly_group)
+            models.UniqueConstraint(
+                fields=["period", "monthly_group"],
+                condition=Q(is_titular=True),
+                name="uniq_titular_per_group_per_period",
+            ),
+        ]
 
-    # def save(self, *args, **kwargs):
-    #     # Auto period depuis start_date si period vide
-    #     if self.start_date and self.period_id is None:
-    #         self.period = get_or_create_period_from_date(self.start_date)
-    #     super().save(*args, **kwargs)
-
+    def clean(self):
+        # ✅ time coherence
+        if (self.start_time and not self.end_time) or (self.end_time and not self.start_time):
+            raise ValidationError("start_time and end_time must be provided together.")
+        if self.start_time and self.end_time and self.start_time >= self.end_time:
+            raise ValidationError("start_time must be < end_time.")
 
 class MonthlyGoal(TimeStampedModel):
     month = models.CharField(max_length=7, validators=[month_validator])

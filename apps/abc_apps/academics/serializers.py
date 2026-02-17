@@ -105,7 +105,6 @@ class StudentMonthlyEnrollmentSerializer(serializers.ModelSerializer):
 # TeacherCourseAssignment (hybride)
 # ─────────────────────────────────────────────
 class TeacherCourseAssignmentSerializer(serializers.ModelSerializer):
-    # Readable extra fields
     teacher_name = serializers.CharField(source="teacher.user.get_full_name", read_only=True)
     teacher_code = serializers.CharField(source="teacher.teacher_code", read_only=True, default="")
 
@@ -126,7 +125,9 @@ class TeacherCourseAssignmentSerializer(serializers.ModelSerializer):
             "is_titular",
             "start_date", "end_date",
 
-            # nouveau système
+            # ✅ NEW
+            "start_time", "end_time",
+
             "period", "period_key",
             "monthly_group", "monthly_group_label",
 
@@ -137,28 +138,99 @@ class TeacherCourseAssignmentSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         """
-        ✅ règles simples:
-        - si monthly_group est donné => period doit exister (ou sera auto depuis start_date)
-        - si period est donné + monthly_group donné => monthly_group.period doit matcher
+        Règles:
+        1) period auto depuis start_date si period absent
+        2) monthly_group.period doit matcher period
+        3) titulaire unique par (period, monthly_group)
+        4) conflit horaire: même teacher ne peut pas overlap
+        5) doublon exact: même teacher + group + course (dans la même période) interdit
         """
-        period = attrs.get("period")
-        monthly_group = attrs.get("monthly_group")
-        start_date = attrs.get("start_date")
+        instance = getattr(self, "instance", None)
 
-        # Auto period depuis start_date si absent (tu le fais déjà dans save du model,
-        # mais ici on garde cohérent côté validation)
+        period = attrs.get("period") or (instance.period if instance else None)
+        monthly_group = attrs.get("monthly_group") or (instance.monthly_group if instance else None)
+        start_date = attrs.get("start_date") or (instance.start_date if instance else None)
+
+        end_date = attrs.get("end_date") if "end_date" in attrs else (instance.end_date if instance else None)
+
+        start_time = attrs.get("start_time") if "start_time" in attrs else (instance.start_time if instance else None)
+        end_time = attrs.get("end_time") if "end_time" in attrs else (instance.end_time if instance else None)
+
+        teacher = attrs.get("teacher") or (instance.teacher if instance else None)
+        course = attrs.get("course") or (instance.course if instance else None)
+        classroom = attrs.get("classroom") or (instance.classroom if instance else None)
+        is_titular = attrs.get("is_titular") if "is_titular" in attrs else (instance.is_titular if instance else False)
+
+        # 1) auto period
         if start_date and period is None:
             period = get_or_create_period_from_date(start_date)
             attrs["period"] = period
 
-        if monthly_group and attrs.get("period") is None:
+        # 2) group must have period
+        if monthly_group and (period is None):
             raise serializers.ValidationError({"period": "Period is required when monthly_group is provided."})
 
-        if monthly_group and attrs.get("period") and monthly_group.period_id != attrs["period"].id:
+        if monthly_group and period and monthly_group.period_id != period.id:
             raise serializers.ValidationError({"monthly_group": "monthly_group does not belong to this period."})
 
-        return attrs
+        # 3) time coherence
+        if (start_time and not end_time) or (end_time and not start_time):
+            raise serializers.ValidationError({"start_time": "Provide both start_time and end_time."})
+        if start_time and end_time and start_time >= end_time:
+            raise serializers.ValidationError({"start_time": "start_time must be < end_time."})
 
+        # Base queryset: same period
+        qs = TeacherCourseAssignment.objects.all()
+        if period:
+            qs = qs.filter(period=period)
+        if instance:
+            qs = qs.exclude(id=instance.id)
+
+        # 4) titulaire unique (en plus du DB constraint)
+        if is_titular and monthly_group and period:
+            if qs.filter(monthly_group=monthly_group, is_titular=True).exists():
+                raise serializers.ValidationError({
+                    "is_titular": "This class already has a titular teacher for this period."
+                })
+
+        # 5) doublon exact
+        if teacher and course and monthly_group and period:
+            if qs.filter(teacher=teacher, course=course, monthly_group=monthly_group).exists():
+                raise serializers.ValidationError("This teacher is already assigned to this course in this class for the period.")
+
+        # 6) conflit horaire teacher (overlap)
+        # overlap: A.start < B.end AND B.start < A.end
+        if teacher and period and start_time and end_time:
+            conflict_teacher = qs.filter(
+                teacher=teacher,
+                start_time__isnull=False,
+                end_time__isnull=False,
+                start_time__lt=end_time,
+                end_time__gt=start_time,
+            )
+            # Optionnel: aussi vérifier start_date/end_date overlap si tu utilises des plages
+            # Ici on suppose assignment mensuel => même period suffit.
+            if conflict_teacher.exists():
+                raise serializers.ValidationError({
+                    "start_time": "Teacher has another assignment that overlaps this time slot."
+                })
+
+        # 7) option: conflit salle (room) même créneau
+        if classroom and period and start_time and end_time:
+            conflict_room = qs.filter(
+                classroom=classroom,
+                start_time__isnull=False,
+                end_time__isnull=False,
+                start_time__lt=end_time,
+                end_time__gt=start_time,
+            )
+            if conflict_room.exists():
+                raise serializers.ValidationError({
+                    "classroom": "This room already has another class at the same time."
+                })
+
+        return attrs
+    
 class MonthlyGoalSerializer(serializers.ModelSerializer):
     class Meta:
         model = MonthlyGoal

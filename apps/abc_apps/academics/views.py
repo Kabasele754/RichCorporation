@@ -204,7 +204,6 @@ class TeacherCourseAssignmentViewSet(ModelViewSet):
         period = self.request.query_params.get("period")
         monthly_group = self.request.query_params.get("monthly_group")
 
-        # ✅ DEFAULT : période du mois courant (si period absent)
         if not period:
             now = timezone.now()
             qs = qs.filter(period__year=now.year, period__month=now.month)
@@ -217,27 +216,31 @@ class TeacherCourseAssignmentViewSet(ModelViewSet):
             qs = qs.filter(classroom_id=classroom)
         if course:
             qs = qs.filter(course_id=course)
-
-        # ✅ monthly_group filtre (garde ton filtre)
         if monthly_group:
             qs = qs.filter(monthly_group_id=monthly_group)
 
         return qs
 
     def perform_create(self, serializer):
+        period = serializer.validated_data.get("period")
+        if period and period.is_closed:
+            raise ValidationError("Cannot create assignment in a closed period.")
         serializer.save(created_by=self.request.user)
 
     def perform_update(self, serializer):
         inst = self.get_object()
         if inst.period and inst.period.is_closed:
             raise ValidationError("Cannot update assignment in a closed period.")
+        # aussi si period changé
+        period = serializer.validated_data.get("period")
+        if period and period.is_closed:
+            raise ValidationError("Cannot move assignment to a closed period.")
         serializer.save()
 
     def perform_destroy(self, instance):
         if instance.period and instance.period.is_closed:
             raise ValidationError("Cannot delete assignment in a closed period.")
         super().perform_destroy(instance)
-
 # ─────────────────────────────────────────────
 # ClassRoom
 # ─────────────────────────────────────────────

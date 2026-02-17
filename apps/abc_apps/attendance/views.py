@@ -29,9 +29,11 @@ class StudentAttendanceViewSet(ViewSet):
         """
         student = request.user.student_profile
         qr_data = request.data.get("qr_data")
+        print("avant ", qr_data)
 
         try:
             parsed = parse_group_qr(qr_data)
+            print("apres ", parsed)
         except ValueError as e:
             return bad(str(e), status_code=400)
 

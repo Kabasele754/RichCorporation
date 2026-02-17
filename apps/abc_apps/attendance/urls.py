@@ -15,5 +15,5 @@ router.register(r"student/exam", StudentExamViewSet, basename="student-exam")
 router.register(r"student/reenroll", StudentReenrollmentViewSet, basename="student-reenroll")
 
 urlpatterns = [
-    path("api/", include(router.urls)),
+    path("", include(router.urls)),
 ]

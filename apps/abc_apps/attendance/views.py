@@ -22,7 +22,7 @@ class StudentAttendanceViewSet(ViewSet):
     permission_classes = [IsAuthenticated, IsStudent]
 
     @action(detail=False, methods=["post"])
-    def scan_door(self, request):
+    def room_scan(self, request):
         """
         POST /api/student/attendance/scan-door/
         body: { "qr_data": "GROUP:12" }
@@ -177,7 +177,7 @@ class StudentExamViewSet(ViewSet):
     permission_classes = [IsAuthenticated, IsStudent]
 
     @action(detail=False, methods=["post"])
-    def scan_entry(self, request):
+    def scan_exam(self, request):
         """
         POST /api/student/exam/scan-entry/
         body: { "qr_data": "GROUP:12", "course_id": 4 }
@@ -234,7 +234,7 @@ class StudentReenrollmentViewSet(ViewSet):
     permission_classes = [IsAuthenticated, IsStudent]
 
     @action(detail=False, methods=["post"])
-    def request(self, request):
+    def reenroll_intent(self, request):
         """
         POST /api/student/reenroll/request/
         body: { "group_id": 12, "will_return": true, "reason": "" }

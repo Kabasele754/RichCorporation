@@ -56,7 +56,7 @@ class User(AbstractUser):
         return " ".join([p for p in parts if p])
 
     @property
-    def full_name_rdc(self):
+    def full_name(self):
         # RDC style: Prenom + Postnom + Nom
         parts = [self.first_name, self.middle_name, self.last_name]
         return " ".join([p for p in parts if p])

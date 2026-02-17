@@ -95,10 +95,13 @@ class StudentHomeworkViewSet(ViewSet):
     def list(self, request):
         student = request.user.student_profile
         course_id = request.query_params.get("course")
+        teacher_id = request.query_params.get("teacher")  # ✅ NEW
 
-        current = StudentMonthlyEnrollment.objects.select_related("group", "period").filter(
-            student=student
-        ).order_by("-period__year", "-period__month").first()
+        current = StudentMonthlyEnrollment.objects.select_related("group", "period") \
+            .filter(student=student) \
+            .order_by("-period__year", "-period__month") \
+            .first()
+
         if not current:
             return bad("No enrollment", status_code=403)
 
@@ -110,8 +113,10 @@ class StudentHomeworkViewSet(ViewSet):
         if course_id:
             qs = qs.filter(course_id=course_id)
 
-        return ok({"items": HomeworkSerializer(qs, many=True).data}, message="Homeworks")
+        if teacher_id:
+            qs = qs.filter(teacher_id=teacher_id)  # ✅ NEW
 
+        return ok({"items": HomeworkSerializer(qs, many=True).data}, message="Homeworks")
 
 class StudentObjectivesViewSet(ViewSet):
     permission_classes = [IsAuthenticated, IsStudent]

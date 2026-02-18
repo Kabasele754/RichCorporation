@@ -87,6 +87,36 @@ def _compute_attendance_status(
 
     late_by = max(0, diff_min - grace)
     return "late", late_by
+
+def _parse_client_ts(client_ts, tz_offset_min) -> Optional[datetime]:
+    """
+    client_ts: int millisecondsSinceEpoch (local device time)
+    tz_offset_min: int minutes offset ex: +120 for Africa/Johannesburg
+    Return: aware datetime (server timezone)
+    """
+    if client_ts in [None, ""]:
+        return None
+    try:
+        ts_ms = int(client_ts)
+    except Exception:
+        return None
+
+    # device local -> naive datetime
+    dt_local_naive = datetime.fromtimestamp(ts_ms / 1000.0)
+
+    # Apply device timezone offset to build an aware dt in that offset
+    try:
+        off_min = int(tz_offset_min or 0)
+    except Exception:
+        off_min = 0
+
+    offset = timezone.get_fixed_timezone(off_min)  # minutes
+    dt_local_aware = timezone.make_aware(dt_local_naive, offset)
+
+    # Convert to server current timezone (recommended)
+    dt_server = dt_local_aware.astimezone(timezone.get_current_timezone())
+    return dt_server
+
 class StudentAttendanceViewSet(ViewSet):
     permission_classes = [IsAuthenticated, IsStudent]
 
@@ -98,7 +128,13 @@ class StudentAttendanceViewSet(ViewSet):
         """
         POST /api/student/attendance/room-scan/
         body:
-          { "qr_data": "...", "lat": -26.2, "lng": 28.0, "client_time": "2026-02-18T08:42:00Z" }
+        {
+          "qr_data": "ABCR|R7|....",
+          "client_ts": 1771404120123,
+          "tz_offset_min": 120,
+          "lat": -26.2,
+          "lng": 28.0
+        }
         """
         student = request.user.student_profile
         qr_raw = (request.data.get("qr_data") or "").strip()
@@ -118,6 +154,7 @@ class StudentAttendanceViewSet(ViewSet):
         today = timezone.localdate()
         period = get_or_create_period_from_date(today)
 
+        # 2) enrollment du mois courant
         enroll = (
             StudentMonthlyEnrollment.objects
             .select_related("group__room")
@@ -129,11 +166,11 @@ class StudentAttendanceViewSet(ViewSet):
 
         group = enroll.group
 
-        # ✅ must match student's room
+        # 3) must match room of group
         if group.room_id != room.id:
             return bad("Wrong classroom", 403)
 
-        # 2) GPS check (optional)
+        # 4) GPS check (optional)
         lat = request.data.get("lat")
         lng = request.data.get("lng")
         if room.campus and lat is not None and lng is not None:
@@ -145,19 +182,28 @@ class StudentAttendanceViewSet(ViewSet):
 
             if not is_within_campus(room.campus, lat_f, lng_f):
                 return bad("Outside campus area", 403)
+
             request.user.set_location(lat_f, lng_f)
 
-        # 3) Time source
-        # Option A: serveur (default)
+        # 5) time source: client_ts+offset (preferred) else server
         server_scan_dt = timezone.now()
+        client_dt = _parse_client_ts(
+            request.data.get("client_ts"),
+            request.data.get("tz_offset_min"),
+        )
 
-        # Option B (facultatif): client_time si présent et valide
-        client_dt = _parse_client_time(request.data.get("client_time"))
+        # ✅ anti-triche: si trop loin du serveur -> ignore client time
+        if client_dt:
+            delta_sec = abs((client_dt - server_scan_dt).total_seconds())
+            if delta_sec > 5 * 60:  # 5 minutes
+                client_dt = None
+
         scan_dt = client_dt or server_scan_dt
 
-        # 4) Compute status present/late
+        # 6) compute present/late
         status, late_by = _compute_attendance_status(group, scan_dt, today)
 
+        # 7) save (unique per period/date/room/student)
         with transaction.atomic():
             checkin, created = DailyRoomCheckIn.objects.get_or_create(
                 period=period,
@@ -174,7 +220,7 @@ class StudentAttendanceViewSet(ViewSet):
             )
 
             if not created:
-                # on met à jour à chaque scan (utile si un student re-scan)
+                # update last scan + status
                 checkin.scanned_at = scan_dt
                 checkin.status = status
                 checkin.monthly_group = group
@@ -185,11 +231,12 @@ class StudentAttendanceViewSet(ViewSet):
                 "checkin": DailyRoomCheckInSerializer(checkin).data,
                 "created": created,
                 "qr_version": parsed.get("version"),
-                "late_by_min": late_by,  # pratique côté UI toast
+                "late_by_min": late_by,
+                "server_ts": int(server_scan_dt.timestamp() * 1000),
+                "client_ts_used": int(scan_dt.timestamp() * 1000),
             },
             "Attendance saved ✅"
         )
-
     # =========================================================
     # 🧪 EXAM SCAN
     # =========================================================

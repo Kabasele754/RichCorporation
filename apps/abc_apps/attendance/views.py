@@ -1,6 +1,6 @@
 # apps/attendance/views.py
 from datetime import date
-from datetime import timedelta
+from datetime import timedelta, datetime
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework.viewsets import ViewSet
@@ -11,6 +11,7 @@ from rest_framework.response import Response
 
 from apps.abc_apps.academics.models import MonthlyClassGroup, Room, StudentMonthlyEnrollment, TeacherCourseAssignment, get_or_create_period_from_date
 from apps.abc_apps.accounts.views import bad
+from apps.abc_apps.attendance.time_qr import compute_status
 from apps.abc_apps.commons.period_utils import next_month
 from apps.abc_apps.commons.responses import ok
 from apps.common.permissions import IsStudent, IsTeacher
@@ -30,12 +31,11 @@ class StudentAttendanceViewSet(ViewSet):
     # =========================================================
     # 📚 CLASS ROOM SCAN
     # =========================================================
+    
     @action(detail=False, methods=["post"], url_path="room-scan")
     def room_scan(self, request):
-
         student = request.user.student_profile
         qr_raw = (request.data.get("qr_data") or "").strip()
-
         if not qr_raw:
             return bad("qr_data is required", 400)
 
@@ -44,10 +44,7 @@ class StudentAttendanceViewSet(ViewSet):
         except ValueError as e:
             return bad(str(e), 400)
 
-        room = Room.objects.select_related("campus").filter(
-            code=parsed["room_code"]
-        ).first()
-
+        room = Room.objects.select_related("campus").filter(code=parsed["room_code"]).first()
         if not room:
             return bad("Room not found", 404)
 
@@ -60,23 +57,33 @@ class StudentAttendanceViewSet(ViewSet):
             .filter(student=student, period=period, status="active")
             .first()
         )
-
         if not enroll:
             return bad("Not enrolled this month", 403)
 
         group = enroll.group
-
         if group.room_id != room.id:
             return bad("Wrong classroom", 403)
 
-        # ✅ GPS check
+        # ✅ read client time (optional)
+        client_ts = request.data.get("client_ts")  # epoch ms
+        client_dt = None
+        client_offset = request.data.get("tz_offset_min")  # ex: 120
+        try:
+            if client_ts is not None:
+                client_dt = datetime.fromtimestamp(int(client_ts) / 1000.0, tz=timezone.get_current_timezone())
+        except Exception:
+            client_dt = None
+
+        # ✅ GPS check (comme tu as déjà)
         lat = request.data.get("lat")
         lng = request.data.get("lng")
-
         if room.campus and lat and lng:
             if not is_within_campus(room.campus, float(lat), float(lng)):
                 return bad("Outside campus area", 403)
             request.user.set_location(float(lat), float(lng))
+
+        server_dt = timezone.now()
+        status = compute_status(group, today, server_dt, client_dt)
 
         checkin, created = DailyRoomCheckIn.objects.get_or_create(
             period=period,
@@ -85,19 +92,95 @@ class StudentAttendanceViewSet(ViewSet):
             room=room,
             student=student,
             defaults={
-                "status": "present",
+                "status": status,
                 "scanned_by": "self_scan",
                 "required_confirmations": 3,
+                "scanned_at": server_dt,
+                "client_scanned_at": client_dt,
+                "client_tz_offset_min": int(client_offset) if client_offset is not None else None,
             }
         )
 
+        # si déjà existant: tu peux mettre à jour le status/scanned_at
+        if not created:
+            checkin.scanned_at = server_dt
+            checkin.status = status
+            checkin.client_scanned_at = client_dt
+            checkin.client_tz_offset_min = int(client_offset) if client_offset is not None else None
+            checkin.save(update_fields=["scanned_at","status","client_scanned_at","client_tz_offset_min"])
+
         return ok(
-            {
-                "checkin": DailyRoomCheckInSerializer(checkin).data,
-                "created": created,
-            },
+            {"checkin": DailyRoomCheckInSerializer(checkin).data, "created": created},
             "Attendance saved ✅"
         )
+    # @action(detail=False, methods=["post"], url_path="room-scan")
+    # def room_scan(self, request):
+
+    #     student = request.user.student_profile
+    #     qr_raw = (request.data.get("qr_data") or "").strip()
+
+    #     if not qr_raw:
+    #         return bad("qr_data is required", 400)
+
+    #     try:
+    #         parsed = parse_room_qr(qr_raw)
+    #     except ValueError as e:
+    #         return bad(str(e), 400)
+
+    #     room = Room.objects.select_related("campus").filter(
+    #         code=parsed["room_code"]
+    #     ).first()
+
+    #     if not room:
+    #         return bad("Room not found", 404)
+
+    #     today = timezone.localdate()
+    #     period = get_or_create_period_from_date(today)
+
+    #     enroll = (
+    #         StudentMonthlyEnrollment.objects
+    #         .select_related("group__room")
+    #         .filter(student=student, period=period, status="active")
+    #         .first()
+    #     )
+
+    #     if not enroll:
+    #         return bad("Not enrolled this month", 403)
+
+    #     group = enroll.group
+
+    #     if group.room_id != room.id:
+    #         return bad("Wrong classroom", 403)
+
+    #     # ✅ GPS check
+    #     lat = request.data.get("lat")
+    #     lng = request.data.get("lng")
+
+    #     if room.campus and lat and lng:
+    #         if not is_within_campus(room.campus, float(lat), float(lng)):
+    #             return bad("Outside campus area", 403)
+    #         request.user.set_location(float(lat), float(lng))
+
+    #     checkin, created = DailyRoomCheckIn.objects.get_or_create(
+    #         period=period,
+    #         date=today,
+    #         monthly_group=group,
+    #         room=room,
+    #         student=student,
+    #         defaults={
+    #             "status": "present",
+    #             "scanned_by": "self_scan",
+    #             "required_confirmations": 3,
+    #         }
+    #     )
+
+    #     return ok(
+    #         {
+    #             "checkin": DailyRoomCheckInSerializer(checkin).data,
+    #             "created": created,
+    #         },
+    #         "Attendance saved ✅"
+    #     )
 
     # =========================================================
     # 🧪 EXAM SCAN

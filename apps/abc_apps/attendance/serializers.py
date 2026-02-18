@@ -20,7 +20,7 @@ class DailyRoomCheckInSerializer(serializers.ModelSerializer):
 
     is_fully_confirmed = serializers.BooleanField(read_only=True)
 
-    # ✅ NEW computed fields
+    # ✅ computed
     class_start_time = serializers.SerializerMethodField()
     late_grace_min = serializers.SerializerMethodField()
     diff_minutes = serializers.SerializerMethodField()
@@ -42,7 +42,6 @@ class DailyRoomCheckInSerializer(serializers.ModelSerializer):
             "scanned_at",
             "is_fully_confirmed",
             "created_at",
-            # ✅ extra
             "class_start_time",
             "late_grace_min",
             "diff_minutes",
@@ -58,7 +57,6 @@ class DailyRoomCheckInSerializer(serializers.ModelSerializer):
         if not start_t:
             return {"start": None, "grace": grace, "diff": None}
 
-        # scanned_at local
         scanned = timezone.localtime(obj.scanned_at)
         start_dt = datetime.combine(obj.date, start_t)
         start_dt = timezone.make_aware(start_dt, timezone.get_current_timezone())
@@ -79,14 +77,14 @@ class DailyRoomCheckInSerializer(serializers.ModelSerializer):
         t = self._timing(obj)
         if t["diff"] is None:
             return None
-        # late_by = minutes after grace
         return max(0, t["diff"] - t["grace"])
 
     def get_within_grace(self, obj):
         t = self._timing(obj)
         if t["diff"] is None:
             return None
-        return t["diff"] <= t["grace"]
+        return t["diff"] <= t["grace"]  # ✅ bool (pas de virgule)
+
 class StudentExamEntrySerializer(serializers.ModelSerializer):
     period_key = serializers.CharField(source="period.key", read_only=True)
     group_label = serializers.CharField(source="monthly_group.label", read_only=True)

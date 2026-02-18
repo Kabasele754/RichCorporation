@@ -9,86 +9,254 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from rest_framework.response import Response
 
-from apps.abc_apps.academics.models import MonthlyClassGroup, StudentMonthlyEnrollment, TeacherCourseAssignment, get_or_create_period_from_date
+from apps.abc_apps.academics.models import MonthlyClassGroup, Room, StudentMonthlyEnrollment, TeacherCourseAssignment, get_or_create_period_from_date
 from apps.abc_apps.accounts.views import bad
+from apps.abc_apps.commons.period_utils import next_month
 from apps.abc_apps.commons.responses import ok
 from apps.common.permissions import IsStudent, IsTeacher
 from .models import DailyRoomCheckIn, DailyRoomCheckInApproval, StudentExamEntry, ReenrollmentIntent
 from .serializers import DailyRoomCheckInSerializer, StudentExamEntrySerializer, ReenrollmentIntentSerializer
-from .qr import parse_group_qr
+
+
+from apps.abc_apps.attendance.qr import parse_group_qr, parse_room_qr
+from apps.abc_apps.attendance.geo import is_within_campus
+
+
 
 
 class StudentAttendanceViewSet(ViewSet):
     permission_classes = [IsAuthenticated, IsStudent]
 
-    @action(detail=False, methods=["post"])
+    # =========================================================
+    # 📚 CLASS ROOM SCAN
+    # =========================================================
+    @action(detail=False, methods=["post"], url_path="room-scan")
     def room_scan(self, request):
-        """
-        POST /api/student/attendance/room_scan/
-        body: { "qr_data": "GROUP:12" }  (QR statique sur la porte)
-        """
+
         student = request.user.student_profile
-        qr_data = (request.data.get("qr_data") or "").strip()
-        if not qr_data:
-            return bad("qr_data is required", status_code=400)
+        qr_raw = (request.data.get("qr_data") or "").strip()
 
-        # 1) Parse QR
+        if not qr_raw:
+            return bad("qr_data is required", 400)
+
         try:
-            parsed = parse_group_qr(qr_data)
+            parsed = parse_room_qr(qr_raw)
         except ValueError as e:
-            return bad(str(e), status_code=400)
+            return bad(str(e), 400)
 
-        group_id = parsed.get("group_id")
-        group = MonthlyClassGroup.objects.select_related("period", "room").filter(id=group_id).first()
-        if not group:
-            return bad("Invalid group", status_code=400)
+        room = Room.objects.select_related("campus").filter(
+            code=parsed["room_code"]
+        ).first()
+
+        if not room:
+            return bad("Room not found", 404)
 
         today = timezone.localdate()
+        period = get_or_create_period_from_date(today)
 
-        # 2) Vérifier enrollment (dans ce group et ce period)
-        enrollment = StudentMonthlyEnrollment.objects.filter(
-            period=group.period,
+        enroll = (
+            StudentMonthlyEnrollment.objects
+            .select_related("group__room")
+            .filter(student=student, period=period, status="active")
+            .first()
+        )
+
+        if not enroll:
+            return bad("Not enrolled this month", 403)
+
+        group = enroll.group
+
+        if group.room_id != room.id:
+            return bad("Wrong classroom", 403)
+
+        # ✅ GPS check
+        lat = request.data.get("lat")
+        lng = request.data.get("lng")
+
+        if room.campus and lat and lng:
+            if not is_within_campus(room.campus, float(lat), float(lng)):
+                return bad("Outside campus area", 403)
+            request.user.set_location(float(lat), float(lng))
+
+        checkin, created = DailyRoomCheckIn.objects.get_or_create(
+            period=period,
+            date=today,
+            monthly_group=group,
+            room=room,
             student=student,
-            group=group,
-            status__in=["active", "pending"],  # mets ["active"] si tu veux strict
-        ).first()
-        if not enrollment:
-            return bad("Not enrolled in this class group for this period.", status_code=403)
-
-        # 3) Sauver checkin (✅ lookup = unique constraint)
-        try:
-            with transaction.atomic():
-                checkin, created = DailyRoomCheckIn.objects.update_or_create(
-                    date=today,
-                    room=group.room,
-                    student=student,
-                    defaults={
-                        "period": group.period,
-                        "monthly_group": group,
-                        "scanned_at": timezone.now(),
-                        "status": "present",
-                        "scanned_by": "self_scan",
-                        "required_confirmations": 3,
-                    },
-                )
-        except IntegrityError:
-            # Au cas où concurrence (double scan très rapide)
-            checkin = DailyRoomCheckIn.objects.filter(date=today, room=group.room, student=student).first()
-            return ok(
-                {"checkin": DailyRoomCheckInSerializer(checkin).data, "created": False},
-                message="Already scanned today ✅",
-            )
-        except Exception as e:
-            return bad(f"Server error: {str(e)}", status_code=500)
+            defaults={
+                "status": "present",
+                "scanned_by": "self_scan",
+                "required_confirmations": 3,
+            }
+        )
 
         return ok(
             {
                 "checkin": DailyRoomCheckInSerializer(checkin).data,
                 "created": created,
-                "qr_version": parsed.get("version"),
             },
-            message="Check-in saved ✅",
+            "Attendance saved ✅"
         )
+
+    # =========================================================
+    # 🧪 EXAM SCAN
+    # =========================================================
+    @action(detail=False, methods=["post"], url_path="scan-exam")
+    def scan_exam(self, request):
+
+        student = request.user.student_profile
+        qr_raw = (request.data.get("qr_data") or "").strip()
+        course_id = request.data.get("course_id")
+
+        if not qr_raw:
+            return bad("qr_data is required", 400)
+
+        try:
+            parsed = parse_room_qr(qr_raw)
+        except ValueError as e:
+            return bad(str(e), 400)
+
+        room = Room.objects.select_related("campus").filter(
+            code=parsed["room_code"]
+        ).first()
+
+        if not room:
+            return bad("Room not found", 404)
+
+        today = timezone.localdate()
+        period = get_or_create_period_from_date(today)
+
+        enroll = (
+            StudentMonthlyEnrollment.objects
+            .select_related("group__room")
+            .filter(student=student, period=period, status="active")
+            .first()
+        )
+
+        if not enroll:
+            return bad("Not enrolled", 403)
+
+        if not enroll.exam_unlock:
+            return bad("Exam locked. Contact teacher.", 403)
+
+        group = enroll.group
+
+        if group.room_id != room.id:
+            return bad("Wrong exam room", 403)
+
+        # ✅ GPS security
+        lat = request.data.get("lat")
+        lng = request.data.get("lng")
+
+        if room.campus and lat and lng:
+            if not is_within_campus(room.campus, float(lat), float(lng)):
+                return bad("Outside campus area", 403)
+            request.user.set_location(float(lat), float(lng))
+
+        entry, created = StudentExamEntry.objects.get_or_create(
+            period=period,
+            date=today,
+            monthly_group=group,
+            room=room,
+            student=student,
+            course_id=course_id,
+        )
+
+        return ok(
+            {
+                "exam_entry": StudentExamEntrySerializer(entry).data,
+                "created": created,
+                "group_id": group.id,
+            },
+            "Exam access granted ✅"
+        )
+
+    # =========================================================
+    # 🔁 RE-ENROLL INTENT (après exam)
+    # =========================================================
+    @action(detail=False, methods=["post"], url_path="reenroll-intent")
+    def reenroll_intent(self, request):
+
+        student = request.user.student_profile
+        will_return = request.data.get("will_return")
+        reason = (request.data.get("reason") or "").strip()
+
+        if will_return is None:
+            return bad("will_return is required", 400)
+
+        will_return = bool(will_return)
+
+        today = timezone.localdate()
+        from_period = get_or_create_period_from_date(today)
+        to_period = get_or_create_period_from_date(next_month(today))
+
+        current = (
+            StudentMonthlyEnrollment.objects
+            .select_related("group")
+            .filter(student=student, period=from_period)
+            .first()
+        )
+
+        if not current:
+            return bad("No current enrollment", 403)
+
+        with transaction.atomic():
+
+            intent, _ = ReenrollmentIntent.objects.update_or_create(
+                student=student,
+                to_period=to_period,
+                defaults={
+                    "from_period": from_period,
+                    "will_return": will_return,
+                    "reason": reason,
+                    "status": "pending",
+                },
+            )
+
+            next_enroll_id = None
+
+            if will_return:
+                next_enroll, _ = StudentMonthlyEnrollment.objects.get_or_create(
+                    student=student,
+                    period=to_period,
+                    group=current.group,
+                    defaults={"status": "pending"},
+                )
+                next_enroll_id = next_enroll.id
+
+        return ok(
+            {
+                "intent": ReenrollmentIntentSerializer(intent).data,
+                "pending_enrollment_id": next_enroll_id,
+            },
+            "Reenrollment saved ✅"
+        )
+
+    # =========================================================
+    # 📜 HISTORY (CLASS + EXAM)
+    # =========================================================
+    @action(detail=False, methods=["get"], url_path="history")
+    def history(self, request):
+
+        student = request.user.student_profile
+
+        class_scans = DailyRoomCheckIn.objects.filter(
+            student=student
+        ).order_by("-date")
+
+        exam_scans = StudentExamEntry.objects.filter(
+            student=student
+        ).order_by("-date")
+
+        return ok(
+            {
+                "class_scans": DailyRoomCheckInSerializer(class_scans, many=True).data,
+                "exam_scans": StudentExamEntrySerializer(exam_scans, many=True).data,
+            },
+            "History"
+        )
+        
 
 class TeacherAttendanceConfirmViewSet(ViewSet):
     permission_classes = [IsAuthenticated, IsTeacher]

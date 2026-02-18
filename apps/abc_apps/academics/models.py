@@ -12,6 +12,36 @@ from apps.abc_apps.commons.models import TimeStampedModel, month_validator
 
 from apps.abc_apps.accounts.models import StudentProfile, TeacherProfile
 
+# Campus
+
+class SchoolCampus(models.Model):
+    name = models.CharField(max_length=120)
+
+    # ✅ Address (même style que User)
+    address_line1 = models.CharField(max_length=180, blank=True, null=True)
+    address_line2 = models.CharField(max_length=180, blank=True, null=True)
+    city = models.CharField(max_length=80, blank=True, null=True)
+    province = models.CharField(max_length=80, blank=True, null=True)
+    postal_code = models.CharField(max_length=20, blank=True, null=True)
+    country = models.CharField(max_length=60, blank=True, null=True, default="South Africa")
+
+    # ✅ Geo center + radius
+    center_lat = models.DecimalField(max_digits=9, decimal_places=6)
+    center_lng = models.DecimalField(max_digits=9, decimal_places=6)
+    radius_m = models.PositiveIntegerField(default=150)
+    is_active = models.BooleanField(default=True)
+
+    @property
+    def address_full(self) -> str:
+        parts = [
+            self.address_line1, self.address_line2,
+            self.city, self.province, self.postal_code, self.country
+        ]
+        return ", ".join([p for p in parts if p])
+
+    def __str__(self):
+        return f"{self.name} ({self.radius_m}m)"
+
 # ─────────────────────────────────────────────
 # 1) Period (mensuel) - déjà validé
 # ─────────────────────────────────────────────
@@ -87,6 +117,14 @@ class AcademicLevel(TimeStampedModel):
 # 3) Room (salle physique)
 # ─────────────────────────────────────────────
 class Room(TimeStampedModel):
+    campus = models.ForeignKey(
+    SchoolCampus,
+    on_delete=models.PROTECT,
+    related_name="rooms",
+    null=True,
+    blank=True,
+)
+
     # ex: "R1", "R2", "LAB-A"
     code = models.CharField(max_length=20, unique=True)
     # ex: "Room 2 - Main Building"

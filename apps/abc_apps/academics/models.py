@@ -194,6 +194,9 @@ class MonthlyClassGroup(TimeStampedModel):
         blank=True,
         related_name="created_monthly_groups",
     )
+    
+    start_time = models.TimeField(default="08:15")        # heure début cours
+    late_grace_min = models.PositiveSmallIntegerField(default=45)  # tolérance minutes
 
     class Meta:
         # ✅ autorise 2 rooms pour le même level+group MAIS pas la même room 2 fois

@@ -34,6 +34,8 @@ class DailyRoomCheckIn(TimeStampedModel):
 
     student = models.ForeignKey(StudentProfile, on_delete=models.CASCADE, related_name="daily_checkins")
     scanned_at = models.DateTimeField(default=timezone.now)
+    client_scanned_at = models.DateTimeField(null=True, blank=True) # time from Flutter
+    client_tz_offset_min = models.IntegerField(null=True, blank=True) # ex: +120
 
     status = models.CharField(max_length=12, choices=STATUS, default="present")
     scanned_by = models.CharField(max_length=12, choices=SCANNED_BY, default="self_scan")

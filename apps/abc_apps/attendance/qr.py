@@ -19,6 +19,7 @@ def parse_room_qr(qr_data: str) -> dict:
     s = (qr_data or "").strip()
     if not s:
         raise ValueError("Empty QR")
+    print("See qr_data", s)
 
     # Simple formats
     if s.startswith("ROOM:"):

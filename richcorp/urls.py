@@ -7,7 +7,7 @@ from apps.blog.models import Post
 from richcorp.admin_site import rich_admin_site
 
 # Register your models on your custom admin site
-rich_admin_site.register(Post, PostAdmin)
+# rich_admin_site.register(Post, PostAdmin)
 
 urlpatterns = [
     path("admin/", admin.site.urls),

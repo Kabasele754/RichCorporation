@@ -1,5 +1,6 @@
 # apps/attendance/views.py
 from datetime import date
+from typing import Optional,Tuple
 from datetime import timedelta, datetime
 from django.db import IntegrityError, transaction
 from django.utils import timezone
@@ -25,36 +26,47 @@ from apps.abc_apps.attendance.geo import is_within_campus
 
 
 
-def _parse_client_time(value: str | None) -> datetime | None:
+def _parse_client_time(value: Optional[str]) -> Optional[datetime]:
     """
     value = ISO string ex: '2026-02-18T08:42:10.123Z' ou sans Z.
     Retourne datetime aware (timezone) ou None.
     """
     if not value:
         return None
+
     s = str(value).strip()
     if not s:
         return None
+
     try:
         # Python datetime.fromisoformat ne supporte pas toujours 'Z'
         if s.endswith("Z"):
             s = s.replace("Z", "+00:00")
+
         dt = datetime.fromisoformat(s)
+
         if timezone.is_naive(dt):
-            # on suppose local timezone
             dt = timezone.make_aware(dt, timezone.get_current_timezone())
+
         return dt
+
     except Exception:
         return None
 
 
-def _compute_attendance_status(group, scan_dt: datetime, date_) -> tuple[str, int | None]:
+def _compute_attendance_status(
+    group,
+    scan_dt: datetime,
+    date_
+) -> Tuple[str, Optional[int]]:
     """
     Retourne (status, late_by_minutes).
+
     - present si <= start_time + grace
     - late si > start_time + grace
-    Si start_time absent => present
+    - si start_time absent => present
     """
+
     start_t = getattr(group, "start_time", None)
     grace = int(getattr(group, "late_grace_min", 45) or 45)
 
@@ -62,18 +74,19 @@ def _compute_attendance_status(group, scan_dt: datetime, date_) -> tuple[str, in
         return "present", None
 
     start_dt = datetime.combine(date_, start_t)
-    start_dt = timezone.make_aware(start_dt, timezone.get_current_timezone())
+    start_dt = timezone.make_aware(
+        start_dt,
+        timezone.get_current_timezone()
+    )
 
     diff_min = int((scan_dt - start_dt).total_seconds() / 60)
 
-    # Si scan avant début => present
+    # ✅ Si scan avant début ou dans la tolérance
     if diff_min <= grace:
         return "present", 0
 
     late_by = max(0, diff_min - grace)
     return "late", late_by
-
-
 class StudentAttendanceViewSet(ViewSet):
     permission_classes = [IsAuthenticated, IsStudent]
 

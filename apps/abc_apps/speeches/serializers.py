@@ -1,15 +1,12 @@
-# apps/speeches/serializers.py
+# apps/abc_apps/speeches/serializers.py
 from __future__ import annotations
-from datetime import datetime
-
-from django.utils import timezone
+from django.db.models import Count
 from rest_framework import serializers
 
 from apps.abc_apps.speeches.models import (
     Speech, SpeechRevision, SpeechCoaching, SpeechAudio,
-    SpeechApproval, SpeechLike, SpeechComment, SpeechShare, SpeechVisibilityGrant
+    SpeechApproval, SpeechComment
 )
-
 
 class SpeechAudioSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField()
@@ -25,6 +22,7 @@ class SpeechAudioSerializer(serializers.ModelSerializer):
         url = obj.audio_file.url
         return request.build_absolute_uri(url) if request else url
 
+
 class SpeechRevisionSerializer(serializers.ModelSerializer):
     revised_by_name = serializers.SerializerMethodField()
 
@@ -37,6 +35,7 @@ class SpeechRevisionSerializer(serializers.ModelSerializer):
         if not u:
             return None
         return f"{getattr(u,'first_name','')}".strip() or getattr(u, "email", "")
+
 
 class SpeechCoachingSerializer(serializers.ModelSerializer):
     teacher_name = serializers.SerializerMethodField()
@@ -52,10 +51,15 @@ class SpeechCoachingSerializer(serializers.ModelSerializer):
         u = t.user
         return f"{getattr(u,'first_name','')} {getattr(u,'last_name','')}".strip()
 
+
 class SpeechSerializer(serializers.ModelSerializer):
     period_key = serializers.CharField(source="period.key", read_only=True)
     group_label = serializers.CharField(source="group.label", read_only=True)
     room_code = serializers.CharField(source="room.code", read_only=True)
+
+    # ✅ level info from MonthlyClassGroup
+    level_id = serializers.IntegerField(source="group.level_id", read_only=True)
+    level_label = serializers.CharField(source="group.level.label", read_only=True)
 
     audios = SpeechAudioSerializer(many=True, read_only=True)
     revisions = SpeechRevisionSerializer(many=True, read_only=True)
@@ -73,18 +77,24 @@ class SpeechSerializer(serializers.ModelSerializer):
             "id",
             "period", "group", "room",
             "period_key", "group_label", "room_code",
+            "level_id", "level_label",
             "author_type", "student", "teacher",
             "author_name",
             "month",
+            "category",
             "title", "raw_content",
             "cover_image",
             "status", "visibility",
             "submitted_at", "published_at",
             "likes_count", "comments_count", "liked_by_me",
             "audios", "revisions", "coachings",
-            "created_at", "updated_at"
+            "created_at", "updated_at",
         ]
-        read_only_fields = ["period", "group", "room", "student", "teacher", "author_type", "status", "submitted_at", "published_at"]
+        read_only_fields = [
+            "period", "group", "room",
+            "student", "teacher", "author_type",
+            "status", "submitted_at", "published_at",
+        ]
 
     def get_author_name(self, obj):
         if obj.author_type == "student" and obj.student and getattr(obj.student, "user", None):
@@ -113,7 +123,6 @@ class SpeechCommentSerializer(serializers.ModelSerializer):
 
     def get_user_name(self, obj):
         return obj.user.get_full_name() if obj.user_id else ""
-
 
 # Petite réponse pour actions
 class SimpleMessageSerializer(serializers.Serializer):

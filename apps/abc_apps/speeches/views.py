@@ -1,66 +1,128 @@
+# apps/abc_apps/speeches/viewsets.py
 from django.db import transaction
-from django.db.models import Count, Exists, OuterRef
+from django.db.models import Count, Exists, OuterRef, Value, BooleanField
 from django.utils import timezone
 
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
-from apps.abc_apps.speeches.models import (
-    Speech, SpeechRevision, SpeechCoaching, SpeechAudio, SpeechApproval,
-    SpeechLike, SpeechComment, SpeechShare, SpeechVisibilityGrant
-)
-from apps.abc_apps.speeches.serializers import (
-    SpeechSerializer, SpeechRevisionSerializer, SpeechCoachingSerializer, SpeechAudioSerializer
-)
-from apps.abc_apps.speeches.utils import get_active_enrollment_for_student
-from apps.common.permissions import IsPrincipal, IsTeacher
-from apps.common.responses import ok, bad  # comme ton attendance
+from apps.abc_apps.accounts.permissions import IsTeacher, IsPrincipal
+from apps.abc_apps.academics.utils import get_active_enrollment_for_student
+
+from apps.abc_apps.speeches.models import Speech, SpeechRevision, SpeechCoaching, SpeechAudio, SpeechApproval, SpeechLike, SpeechComment
+from apps.abc_apps.speeches.serializers import SpeechSerializer, SpeechRevisionSerializer, SpeechCoachingSerializer, SpeechAudioSerializer
+from apps.common.responses import ok
+
+def _norm(x):
+    if not x:
+        return None
+    x = str(x).strip()
+    return x or None
+
+def _norm_lower(x):
+    x = _norm(x)
+    return x.lower() if x else None
+
+def _apply_filters(qs, request):
+    qp = request.query_params
+    month = _norm(qp.get("month"))              # "2026-02"
+    category = _norm_lower(qp.get("category"))  # "info"...
+    author = _norm_lower(qp.get("author"))      # "student"|"teacher"|"all"
+    level_id = qp.get("level_id")
+    group_id = qp.get("group_id")
+
+    if month:
+        qs = qs.filter(period__key=month)
+    if category and category != "all":
+        qs = qs.filter(category=category)
+    if author and author != "all":
+        qs = qs.filter(author_type=author)
+
+    if level_id:
+        try:
+            qs = qs.filter(group__level_id=int(level_id))
+        except Exception:
+            pass
+
+    if group_id:
+        try:
+            qs = qs.filter(group_id=int(group_id))
+        except Exception:
+            pass
+
+    return qs
+
+def _apply_visibility_for_feed(qs, request):
+    u = getattr(request, "user", None)
+    qs = qs.filter(status="published", is_deleted=False)
+    if not (u and u.is_authenticated):
+        return qs.filter(visibility="public")
+    return qs.filter(visibility__in=["public", "school"])
+
 
 class SpeechViewSet(ModelViewSet):
     serializer_class = SpeechSerializer
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
-    def get_queryset(self):
-        u = self.request.user
+    def get_permissions(self):
+        # public endpoints
+        if self.action in ["feed", "month", "last_month", "popular", "latest"]:
+            return [AllowAny()]
+        return super().get_permissions()
+
+    def _base_qs(self):
+        u = getattr(self.request, "user", None)
+
         qs = (
             Speech.objects
-            .select_related("period", "group", "room", "student__user", "teacher__user")
+            .select_related("period", "group", "group__level", "room", "student__user", "teacher__user")
             .filter(is_deleted=False)
         )
 
-        # annotate social counts + liked_by_me
-        qs = qs.annotate(
-            likes_count=Count("likes", distinct=True),
-            comments_count=Count("comments", distinct=True),
-            liked_by_me=Exists(
-                SpeechLike.objects.filter(speech_id=OuterRef("pk"), user=u)
-            ),
-        )
+        if u and u.is_authenticated:
+            qs = qs.annotate(
+                likes_count=Count("likes", distinct=True),
+                comments_count=Count("comments", distinct=True),
+                liked_by_me=Exists(SpeechLike.objects.filter(speech_id=OuterRef("pk"), user=u)),
+            )
+        else:
+            qs = qs.annotate(
+                likes_count=Count("likes", distinct=True),
+                comments_count=Count("comments", distinct=True),
+                liked_by_me=Value(False, output_field=BooleanField()),
+            )
 
-        # feed published only
-        if self.action == "feed":
-            return qs.filter(status="published").order_by("-published_at", "-created_at")
+        return qs
 
-        # my speeches
+    def get_queryset(self):
+        """
+        Authenticated "my list":
+        - student => only his speeches
+        - teacher => only his speeches
+        - staff => all
+        """
+        u = self.request.user
+        qs = self._base_qs()
+
         if getattr(u, "role", "") == "student":
             return qs.filter(student__user=u).order_by("-created_at")
         if getattr(u, "role", "") == "teacher":
             return qs.filter(teacher__user=u).order_by("-created_at")
-
         return qs.order_by("-created_at")
 
     def perform_create(self, serializer):
         u = self.request.user
 
-        # ✅ STUDENT: derive period/group/room from enrollment (same as attendance)
+        # ✅ STUDENT: derive from monthly enrollment (period/group/room)
         if getattr(u, "role", "") == "student":
             student = u.student_profile
             enroll, period = get_active_enrollment_for_student(student)
             if not enroll:
-                raise ValueError("Not enrolled this month")  # DRF will error; better: ValidationError
+                # DRF-friendly error:
+                raise ValueError("Not enrolled this month")
 
             group = enroll.group
             room = group.room
@@ -71,20 +133,86 @@ class SpeechViewSet(ModelViewSet):
                 period=period,
                 group=group,
                 room=room,
+                month=period.key,  # optional but useful
                 status="draft",
             )
             return
 
-        # ✅ TEACHER: you can set period/group if you want from assignment, else keep nullable
         if getattr(u, "role", "") == "teacher":
             serializer.save(author_type="teacher", teacher=u.teacher_profile, status="draft")
             return
 
         serializer.save(status="draft")
 
-    # ───────────────────────────────
-    # Submit (student/teacher)
-    # ───────────────────────────────
+    # ─────────────────────────────
+    # Public/Home endpoints
+    # ─────────────────────────────
+
+    @action(detail=False, methods=["get"], url_path="feed")
+    def feed(self, request):
+        qs = _apply_visibility_for_feed(self._base_qs(), request)
+        qs = _apply_filters(qs, request)
+        qs = qs.order_by("-published_at", "-created_at")[:50]
+        ser = SpeechSerializer(qs, many=True, context={"request": request})
+        return ok({"items": ser.data}, "Feed")
+
+    @action(detail=False, methods=["get"], url_path="month")
+    def month(self, request):
+        qs = _apply_visibility_for_feed(self._base_qs(), request)
+
+        month = _norm(request.query_params.get("month"))
+        if not month:
+            today = timezone.localdate()
+            month = f"{today.year:04d}-{today.month:02d}"
+
+        qs = qs.filter(period__key=month)
+        qs = _apply_filters(qs, request)
+        qs = qs.order_by("-published_at", "-created_at")[:50]
+
+        ser = SpeechSerializer(qs, many=True, context={"request": request})
+        return ok({"month": month, "items": ser.data}, "Month")
+
+    @action(detail=False, methods=["get"], url_path="last-month")
+    def last_month(self, request):
+        qs = _apply_visibility_for_feed(self._base_qs(), request)
+
+        today = timezone.localdate()
+        y = today.year
+        m = today.month - 1
+        if m == 0:
+            y -= 1
+            m = 12
+        last_key = f"{y:04d}-{m:02d}"
+
+        qs = qs.filter(period__key=last_key)
+        qs = _apply_filters(qs, request)
+        qs = qs.order_by("-published_at", "-created_at")[:50]
+
+        ser = SpeechSerializer(qs, many=True, context={"request": request})
+        return ok({"month": last_key, "items": ser.data}, "Last month")
+
+    @action(detail=False, methods=["get"], url_path="popular")
+    def popular(self, request):
+        qs = _apply_visibility_for_feed(self._base_qs(), request)
+        qs = _apply_filters(qs, request)
+
+        qs = qs.order_by("-likes_count", "-comments_count", "-published_at", "-created_at")[:30]
+        ser = SpeechSerializer(qs, many=True, context={"request": request})
+        return ok({"items": ser.data}, "Popular")
+
+    @action(detail=False, methods=["get"], url_path="latest")
+    def latest(self, request):
+        qs = _apply_visibility_for_feed(self._base_qs(), request)
+        qs = _apply_filters(qs, request)
+
+        qs = qs.order_by("-published_at", "-created_at")[:50]
+        ser = SpeechSerializer(qs, many=True, context={"request": request})
+        return ok({"items": ser.data}, "Latest")
+
+    # ─────────────────────────────
+    # Workflow endpoints
+    # ─────────────────────────────
+
     @action(detail=True, methods=["post"], url_path="submit")
     def submit(self, request, pk=None):
         speech = self.get_object()
@@ -102,13 +230,9 @@ class SpeechViewSet(ModelViewSet):
         speech.save(update_fields=["status", "submitted_at"])
         return ok({"speech": SpeechSerializer(speech, context={"request": request}).data}, "Submitted ✅")
 
-    # ───────────────────────────────
-    # Teacher add revision
-    # ───────────────────────────────
     @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsTeacher], url_path="add-revision")
     def add_revision(self, request, pk=None):
         speech = self.get_object()
-
         revised_content = (request.data.get("revised_content") or "").strip()
         notes = (request.data.get("notes") or "").strip()
         is_final = bool(request.data.get("is_final", False))
@@ -133,9 +257,6 @@ class SpeechViewSet(ModelViewSet):
 
         return ok({"revision": SpeechRevisionSerializer(rev).data}, "Correction saved ✅")
 
-    # ───────────────────────────────
-    # Teacher coach
-    # ───────────────────────────────
     @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsTeacher], url_path="coach")
     def coach(self, request, pk=None):
         speech = self.get_object()
@@ -156,9 +277,6 @@ class SpeechViewSet(ModelViewSet):
 
         return ok({"coaching": SpeechCoachingSerializer(c).data}, "Coaching saved ✅")
 
-    # ───────────────────────────────
-    # Upload audio
-    # ───────────────────────────────
     @action(detail=True, methods=["post"], url_path="upload-audio")
     def upload_audio(self, request, pk=None):
         speech = self.get_object()
@@ -185,11 +303,9 @@ class SpeechViewSet(ModelViewSet):
             voice_name=(request.data.get("voice_name") or "").strip(),
             is_primary=bool(request.data.get("is_primary", False)),
         )
-        return ok({"audio": SpeechAudioSerializer(a).data}, "Audio uploaded ✅")
 
-    # ───────────────────────────────
-    # Request publish (cover required)
-    # ───────────────────────────────
+        return ok({"audio": SpeechAudioSerializer(a, context={"request": request}).data}, "Audio uploaded ✅")
+
     @action(detail=True, methods=["post"], url_path="request-publish")
     def request_publish(self, request, pk=None):
         speech = self.get_object()
@@ -215,9 +331,6 @@ class SpeechViewSet(ModelViewSet):
         speech.save(update_fields=["status"])
         return ok({"speech": SpeechSerializer(speech, context={"request": request}).data}, "Sent for approval ✅")
 
-    # ───────────────────────────────
-    # Principal decide
-    # ───────────────────────────────
     @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsPrincipal], url_path="decide")
     def decide(self, request, pk=None):
         speech = self.get_object()
@@ -256,7 +369,8 @@ class SpeechViewSet(ModelViewSet):
                 msg = "Rejected ❌"
 
         return ok({"speech": SpeechSerializer(speech, context={"request": request}).data}, msg)
-
+    
+    
     # ───────────────────────────────
     # Social actions (like/comment/share/grant/feed)
     # ───────────────────────────────

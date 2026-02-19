@@ -3,7 +3,7 @@
 # =========================
 from django.utils import timezone
 from rest_framework.viewsets import ModelViewSet
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.exceptions import ValidationError
 
 from apps.common.pagination import StandardPagination
@@ -58,13 +58,16 @@ class AcademicPeriodViewSet(ModelViewSet):
         super().perform_destroy(instance)
 
 
+
 # ─────────────────────────────────────────────
 # AcademicLevel
 # ─────────────────────────────────────────────
 class AcademicLevelViewSet(ModelViewSet):
     queryset = AcademicLevel.objects.all().order_by("order", "label")
     serializer_class = AcademicLevelSerializer
-    permission_classes = [IsAuthenticated, (IsSecretary | IsStaffOrPrincipal)]
+    permission_classes =[AllowAny]
+    
+    # permission_classes = [IsAuthenticated, (IsSecretary | IsStaffOrPrincipal)]
 
 
 # ─────────────────────────────────────────────

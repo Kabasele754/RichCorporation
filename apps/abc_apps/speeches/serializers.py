@@ -12,12 +12,18 @@ from apps.abc_apps.speeches.models import (
 
 
 class SpeechAudioSerializer(serializers.ModelSerializer):
+    url = serializers.SerializerMethodField()
+
     class Meta:
         model = SpeechAudio
-        fields = [
-            "id", "kind", "audio_file", "duration_sec", "transcript_text",
-            "engine", "voice_name", "is_primary", "created_at"
-        ]
+        fields = ["id", "kind", "url", "duration_sec", "created_at", "engine", "voice_name", "is_primary"]
+
+    def get_url(self, obj):
+        request = self.context.get("request")
+        if not obj.audio_file:
+            return None
+        url = obj.audio_file.url
+        return request.build_absolute_uri(url) if request else url
 
 class SpeechRevisionSerializer(serializers.ModelSerializer):
     revised_by_name = serializers.SerializerMethodField()

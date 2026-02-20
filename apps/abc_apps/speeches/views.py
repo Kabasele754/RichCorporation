@@ -16,7 +16,7 @@ from apps.abc_apps.speeches.models import (
     SpeechApproval, SpeechLike, SpeechComment
 )
 from apps.abc_apps.speeches.serializers import (
-    SpeechSerializer, SpeechRevisionSerializer, SpeechCoachingSerializer, SpeechAudioSerializer
+    SpeechSerializer, SpeechRevisionSerializer, SpeechCoachingSerializer, SpeechAudioSerializer, SpeechCommentSerializer
 )
 
 from apps.common.responses import ok, bad
@@ -116,7 +116,7 @@ class SpeechViewSet(ModelViewSet):
 
     def get_permissions(self):
         # public endpoints
-        if self.action in ["feed", "month", "last_month", "popular", "latest"]:
+        if self.action in ["feed", "month", "last_month", "popular", "latest", "comments"]:
             return [AllowAny()]
         return super().get_permissions()
 
@@ -448,3 +448,19 @@ class SpeechViewSet(ModelViewSet):
 
         c = SpeechComment.objects.create(speech=speech, user=request.user, content=content)
         return ok({"comment": {"id": c.id, "content": c.content}}, "Comment added ✅")
+    
+    @action(detail=True, methods=["get"], url_path="comments")
+    def comments(self, request, pk=None):
+        speech = self.get_object()
+
+        # ✅ seulement published si tu veux
+        if speech.status != "published":
+            return ok({"items": []}, "Not published")
+
+        qs = (SpeechComment.objects
+              .filter(speech=speech, is_hidden=False)
+              .select_related("user")
+              .order_by("-created_at")[:200])
+
+        ser = SpeechCommentSerializer(qs, many=True)
+        return ok({"items": ser.data}, "Comments")

@@ -116,7 +116,7 @@ class SpeechViewSet(ModelViewSet):
 
     def get_permissions(self):
         # public endpoints
-        if self.action in ["feed", "month", "last_month", "popular", "latest", "comments"]:
+        if self.action in ["feed", "month", "last_month", "popular", "latest", "comments", "comment", "like"]:
             return [AllowAny()]
         return super().get_permissions()
 

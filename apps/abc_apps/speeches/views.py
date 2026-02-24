@@ -115,9 +115,10 @@ class SpeechViewSet(ModelViewSet):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_permissions(self):
-        # public endpoints
-        if self.action in ["feed", "month", "last_month", "popular", "latest", "comments", "comment", "like"]:
+        if self.action in ["feed", "month", "last_month", "popular", "latest", "comments"]:
             return [AllowAny()]
+        if self.action in ["like", "comment"]:
+            return [IsAuthenticated()]
         return super().get_permissions()
 
     def _base_qs(self):
@@ -146,15 +147,14 @@ class SpeechViewSet(ModelViewSet):
         return qs
 
     def get_queryset(self):
-        """
-        Authenticated "my list":
-        - student => only his speeches
-        - teacher => only his speeches
-        - staff => all
-        """
-        u = self.request.user
         qs = self._base_qs()
 
+        # ✅ Pour les endpoints publics + social, on ne filtre PAS par owner
+        if self.action in ["feed", "month", "last_month", "popular", "latest", "comments", "comment", "like"]:
+            return qs.order_by("-created_at")
+
+        # ✅ Pour "my list" / CRUD privé : filtrer par owner
+        u = self.request.user
         if getattr(u, "role", "") == "student":
             return qs.filter(student__user=u).order_by("-created_at")
         if getattr(u, "role", "") == "teacher":
@@ -444,6 +444,7 @@ class SpeechViewSet(ModelViewSet):
 
         content = (request.data.get("content") or "").strip()
         if not content:
+            print("Content is empty")
             return bad("content is required", 400)
 
         c = SpeechComment.objects.create(speech=speech, user=request.user, content=content)
@@ -455,6 +456,7 @@ class SpeechViewSet(ModelViewSet):
 
         # ✅ seulement published si tu veux
         if speech.status != "published":
+            print("Speech not published, cannot show comments")
             return ok({"items": []}, "Not published")
 
         qs = (SpeechComment.objects

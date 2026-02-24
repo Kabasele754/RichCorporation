@@ -181,6 +181,7 @@ class SpeechViewSet(ModelViewSet):
 
             # ✅ 2) enrollment doit exister
             if not enroll:
+                print("No active enrollment found for student, cannot create speech")
                 raise ValidationError({"detail": "Student is not enrolled for the current month."})
 
             group = enroll.group

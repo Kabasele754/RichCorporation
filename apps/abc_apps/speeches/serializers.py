@@ -95,6 +95,13 @@ class SpeechSerializer(serializers.ModelSerializer):
             "student", "teacher", "author_type",
             "status", "submitted_at", "published_at",
         ]
+        
+    def validate_category(self, v):
+        v = (v or "").strip().lower()
+        allowed = {c[0] for c in Speech.CATEGORY}  # {"entertainment","info","motivation","inspiration"}
+        if v not in allowed:
+            raise serializers.ValidationError(f"Invalid category. Allowed: {sorted(allowed)}")
+        return v
 
     def get_author_name(self, obj):
         if obj.author_type == "student" and obj.student and getattr(obj.student, "user", None):

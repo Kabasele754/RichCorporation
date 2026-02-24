@@ -167,22 +167,16 @@ class SpeechViewSet(ModelViewSet):
     def perform_create(self, serializer):
         u = self.request.user
         print("CREATE SPEECH DATA:", self.request.data)
-        print("USER:", u.id, u.role)
+        print("USER:", u.id, getattr(u, "role", None))
+
+        # ✅ category choisi par student (sinon default "info")
+        category = (self.request.data.get("category") or "").strip().lower() or "info"
 
         if getattr(u, "role", "") == "student":
-            # ✅ 1) student_profile doit exister
-            try:
-                student = u.student_profile
-            except Exception:
-                raise ValidationError({"detail": "Student profile not found for this account."})
-            print("Student profile found:", student)
-
+            student = u.student_profile
             enroll, period = get_active_enrollment_for_student(student)
             print("Active enrollment for student:", enroll, "period:", period)
-
-            # ✅ 2) enrollment doit exister
             if not enroll:
-                print("No active enrollment found for student, cannot create speech")
                 raise ValidationError({"detail": "Student is not enrolled for the current month."})
 
             group = enroll.group
@@ -196,14 +190,15 @@ class SpeechViewSet(ModelViewSet):
                 room=room,
                 month=f"{period.year:04d}-{period.month:02d}",
                 status="draft",
+                category=category,  # ✅ IMPORTANT: on fixe la valeur validée
             )
             return
 
         if getattr(u, "role", "") == "teacher":
-            serializer.save(author_type="teacher", teacher=u.teacher_profile, status="draft")
+            serializer.save(author_type="teacher", teacher=u.teacher_profile, status="draft", category=category)
             return
 
-        serializer.save(status="draft")
+        serializer.save(status="draft", category=category)
     
     # ─────────────────────────────
     # Public/Home endpoints

@@ -171,8 +171,10 @@ class SpeechViewSet(ModelViewSet):
 
         # ✅ STUDENT: derive from monthly enrollment (period/group/room)
         if getattr(u, "role", "") == "student":
+            
             student = u.student_profile
             enroll, period = get_active_enrollment_for_student(student)
+            print("Active enrollment for student:", enroll, "period:", period)  
             if not enroll:
                 raise ValidationError({"detail": "Student is not enrolled for the current month."})
 

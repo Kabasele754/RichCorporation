@@ -167,21 +167,23 @@ class SpeechViewSet(ModelViewSet):
     def perform_create(self, serializer):
         u = self.request.user
         print("CREATE SPEECH DATA:", self.request.data)
-        print("USER:", self.request.user.id, self.request.user.role)
+        print("USER:", u.id, u.role)
 
-        # ✅ STUDENT: derive from monthly enrollment (period/group/room)
         if getattr(u, "role", "") == "student":
-            
-            student = u.student_profile
+            try:
+                student = u.student_profile
+            except Exception:
+                raise ValidationError({"detail": "Student profile not found for this account."})
+
             enroll, period = get_active_enrollment_for_student(student)
-            print("Active enrollment for student:", enroll, "period:", period)  
+            print("Active enrollment for student:", enroll, "period:", period)
+
             if not enroll:
                 raise ValidationError({"detail": "Student is not enrolled for the current month."})
 
             group = enroll.group
             room = group.room
 
-            # ✅ FIX month value must be "YYYY-MM" (not period.key)
             serializer.save(
                 author_type="student",
                 student=student,
@@ -198,7 +200,6 @@ class SpeechViewSet(ModelViewSet):
             return
 
         serializer.save(status="draft")
-
     # ─────────────────────────────
     # Public/Home endpoints
     # ─────────────────────────────

@@ -175,6 +175,7 @@ class SpeechViewSet(ModelViewSet):
                 student = u.student_profile
             except Exception:
                 raise ValidationError({"detail": "Student profile not found for this account."})
+            print("Student profile found:", student)
 
             enroll, period = get_active_enrollment_for_student(student)
             print("Active enrollment for student:", enroll, "period:", period)

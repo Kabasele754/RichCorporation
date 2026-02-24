@@ -1,4 +1,6 @@
 # apps/abc_apps/speeches/viewsets.py
+from urllib import request
+
 from django.db import transaction
 from django.db.models import Count, Exists, OuterRef, Value, BooleanField
 from django.utils import timezone
@@ -7,6 +9,7 @@ from rest_framework.viewsets import ModelViewSet
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework.exceptions import ValidationError
 
 from apps.abc_apps.accounts.permissions import IsTeacher, IsPrincipal
 from apps.abc_apps.academics.utils import get_active_enrollment_for_student
@@ -163,13 +166,15 @@ class SpeechViewSet(ModelViewSet):
 
     def perform_create(self, serializer):
         u = self.request.user
+        print("CREATE SPEECH DATA:", self.request.data)
+        print("USER:", self.request.user.id, self.request.user.role)
 
         # ✅ STUDENT: derive from monthly enrollment (period/group/room)
         if getattr(u, "role", "") == "student":
             student = u.student_profile
             enroll, period = get_active_enrollment_for_student(student)
             if not enroll:
-                raise ValueError("Not enrolled this month")
+                raise ValidationError({"detail": "Student is not enrolled for the current month."})
 
             group = enroll.group
             room = group.room

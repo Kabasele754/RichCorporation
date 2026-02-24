@@ -170,6 +170,7 @@ class SpeechViewSet(ModelViewSet):
         print("USER:", u.id, u.role)
 
         if getattr(u, "role", "") == "student":
+            # ✅ 1) student_profile doit exister
             try:
                 student = u.student_profile
             except Exception:
@@ -178,6 +179,7 @@ class SpeechViewSet(ModelViewSet):
             enroll, period = get_active_enrollment_for_student(student)
             print("Active enrollment for student:", enroll, "period:", period)
 
+            # ✅ 2) enrollment doit exister
             if not enroll:
                 raise ValidationError({"detail": "Student is not enrolled for the current month."})
 
@@ -200,6 +202,7 @@ class SpeechViewSet(ModelViewSet):
             return
 
         serializer.save(status="draft")
+    
     # ─────────────────────────────
     # Public/Home endpoints
     # ─────────────────────────────

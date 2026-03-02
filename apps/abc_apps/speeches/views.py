@@ -366,7 +366,7 @@ class SpeechViewSet(ModelViewSet):
         qs = (self._base_qs()
             .filter(period=period, group_id__in=group_ids)
             .filter(author_type="student")
-            .filter(status__in=["draft","submitted", "needs_revision", "pending_approval", "published"])
+            .filter(status__in=["draft","corrected","coached","submitted", "needs_revision", "pending_approval", "published"])
             .order_by("-submitted_at", "-created_at")[:80])
         
 

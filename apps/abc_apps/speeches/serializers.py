@@ -10,7 +10,7 @@ from apps.abc_apps.speeches.models import (
 
 class SpeechAudioSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField()
-    uploaded_by_id = serializers.IntegerField(source="uploaded_by_id", read_only=True)
+    uploaded_by_id = serializers.IntegerField(read_only=True)
     uploaded_by_name = serializers.SerializerMethodField()
 
     class Meta:
@@ -37,7 +37,7 @@ class SpeechAudioSerializer(serializers.ModelSerializer):
 
 class SpeechRevisionSerializer(serializers.ModelSerializer):
     revised_by_name = serializers.SerializerMethodField()
-    revised_by_id = serializers.IntegerField(source="revised_by_id", read_only=True)
+    revised_by_id = serializers.IntegerField( read_only=True)
 
     class Meta:
         model = SpeechRevision

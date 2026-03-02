@@ -199,24 +199,33 @@ class SpeechViewSet(ModelViewSet):
 
     def get_queryset(self):
         """
-        Authenticated "my list":
-        - student => only his speeches
-        - teacher => only his speeches
-        - staff => all
+        LIST endpoints restent filtrés par rôle (my list).
+        MAIS les actions detail (like/coach/upload-audio/add-revision/...) doivent voir tous les speeches
+        sinon get_object() retourne 404.
         """
-        u = self.request.user
         qs = self._base_qs()
+        u = self.request.user
 
+        # ✅ IMPORTANT: actions detail doivent accéder au speech cible
+        detail_actions = {
+            "retrieve",
+            "like", "comment", "comments",
+            "upload_audio",
+            "add_revision", "coach",
+            "submit", "request_publish", "decide",
+        }
+        if getattr(self, "action", None) in detail_actions:
+            return qs.order_by("-created_at")
+
+        # ✅ LIST "my speeches" (inchangé)
         if getattr(u, "role", "") == "student":
             return qs.filter(student__user=u).order_by("-created_at")
 
         if getattr(u, "role", "") == "teacher":
-            # print("Filtering teacher speeches for user:", u.username)
-            # print("Base QS for teacher:", qs.query)
             return qs.filter(teacher__user=u).order_by("-created_at")
 
         return qs.order_by("-created_at")
-
+   
     def perform_create(self, serializer):
         u = self.request.user
 
@@ -586,6 +595,7 @@ class SpeechViewSet(ModelViewSet):
         ser = SpeechCommentSerializer(qs, many=True)
         return ok({"items": ser.data}, "Comments")
   
+    
     
     
     

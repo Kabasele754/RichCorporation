@@ -178,6 +178,7 @@ class SpeechViewSet(ModelViewSet):
             .select_related("period", "group", "group__level", "room", "student__user", "teacher__user")
             .filter(is_deleted=False)
         )
+        print("Base QS:", qs.query)
 
         if u and u.is_authenticated:
             qs = qs.annotate(

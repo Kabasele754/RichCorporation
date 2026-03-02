@@ -211,8 +211,8 @@ class SpeechViewSet(ModelViewSet):
             return qs.filter(student__user=u).order_by("-created_at")
 
         if getattr(u, "role", "") == "teacher":
-            print("Filtering teacher speeches for user:", u.username)
-            print("Base QS for teacher:", qs.query)
+            # print("Filtering teacher speeches for user:", u.username)
+            # print("Base QS for teacher:", qs.query)
             return qs.filter(teacher__user=u).order_by("-created_at")
 
         return qs.order_by("-created_at")
@@ -379,70 +379,74 @@ class SpeechViewSet(ModelViewSet):
     # ─────────────────────────────
     # Social actions (auth only)
     # ─────────────────────────────
-    @action(detail=True, methods=["post"], url_path="like")
-    def like(self, request, pk=None):
-        speech = self.get_object()
-        if speech.status != "published":
-            return bad("Not published", 400)
-
-        # ✅ if visibility class, ensure allowed
-        if speech.visibility == "class":
-            if not _class_visibility_predicate(request.user).resolve_expression:
-                # (simple fallback) do explicit check:
-                allowed = Speech.objects.filter(pk=speech.pk).filter(_class_visibility_predicate(request.user)).exists()
-                if not allowed:
-                    return bad("Not allowed", 403)
-
-        obj, created = SpeechLike.objects.get_or_create(speech=speech, user=request.user)
-        if not created:
-            obj.delete()
-            return ok({"liked": False}, "Unliked")
-        return ok({"liked": True}, "Liked")
-
-    @action(detail=True, methods=["post"], url_path="comment")
-    def comment(self, request, pk=None):
-        speech = self.get_object()
-        if speech.status != "published":
-            return bad("Not published", 400)
-
-        if speech.visibility == "class":
-            allowed = Speech.objects.filter(pk=speech.pk).filter(_class_visibility_predicate(request.user)).exists()
-            if not allowed:
-                return bad("Not allowed", 403)
-
-        content = (request.data.get("content") or "").strip()
-        if not content:
-            return bad("content is required", 400)
-
-        c = SpeechComment.objects.create(speech=speech, user=request.user, content=content)
-        return ok({"comment": {"id": c.id, "content": c.content}}, "Comment added ✅")
-
-    @action(detail=True, methods=["get"], url_path="comments")
-    def comments(self, request, pk=None):
-        speech = self.get_object()
-        if speech.status != "published":
-            return ok({"items": []}, "Not published")
-
-        # ✅ if class speech: anonymous can't see; auth must be allowed
-        if speech.visibility == "class":
-            u = getattr(request, "user", None)
-            if not (u and u.is_authenticated):
-                return ok({"items": []}, "Private")
-            allowed = Speech.objects.filter(pk=speech.pk).filter(_class_visibility_predicate(u)).exists()
-            if not allowed:
-                return ok({"items": []}, "Not allowed")
-
-        qs = (SpeechComment.objects
-              .filter(speech=speech, is_hidden=False)
-              .select_related("user")
-              .order_by("-created_at")[:200])
-
-        ser = SpeechCommentSerializer(qs, many=True)
-        return ok({"items": ser.data}, "Comments")
-
     # ─────────────────────────────
-    # Audio upload (auth only)
+    # Workflow endpoints
     # ─────────────────────────────
+
+    @action(detail=True, methods=["post"], url_path="submit")
+    def submit(self, request, pk=None):
+        speech = self.get_object()
+
+        if request.user.role == "student" and (not speech.student_id or speech.student.user_id != request.user.id):
+            return bad("Not allowed", 403)
+        if request.user.role == "teacher" and (not speech.teacher_id or speech.teacher.user_id != request.user.id):
+            return bad("Not allowed", 403)
+
+        if speech.status not in ["draft", "needs_revision"]:
+            return bad("Cannot submit in current status", 400)
+
+        speech.status = "submitted"
+        speech.submitted_at = timezone.now()
+        speech.save(update_fields=["status", "submitted_at"])
+        return ok({"speech": SpeechSerializer(speech, context={"request": request}).data}, "Submitted ✅")
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsTeacher], url_path="add-revision")
+    def add_revision(self, request, pk=None):
+        speech = self.get_object()
+        revised_content = (request.data.get("revised_content") or "").strip()
+        notes = (request.data.get("notes") or "").strip()
+        is_final = bool(request.data.get("is_final", False))
+
+        if not revised_content:
+            return bad("revised_content is required", 400)
+
+        last = SpeechRevision.objects.filter(speech=speech).order_by("-version").first()
+        next_version = (last.version + 1) if last else 1
+
+        with transaction.atomic():
+            rev = SpeechRevision.objects.create(
+                speech=speech,
+                version=next_version,
+                revised_by=request.user,
+                revised_content=revised_content,
+                notes=notes,
+                is_final=is_final,
+            )
+            speech.status = "corrected"
+            speech.save(update_fields=["status"])
+
+        return ok({"revision": SpeechRevisionSerializer(rev).data}, "Correction saved ✅")
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsTeacher], url_path="coach")
+    def coach(self, request, pk=None):
+        speech = self.get_object()
+        notes = (request.data.get("pronunciation_notes") or "").strip()
+        word_tips = request.data.get("word_tips", [])
+        is_final = bool(request.data.get("is_final", False))
+
+        with transaction.atomic():
+            c = SpeechCoaching.objects.create(
+                speech=speech,
+                teacher=request.user.teacher_profile,
+                pronunciation_notes=notes,
+                word_tips=word_tips if isinstance(word_tips, list) else [],
+                is_final=is_final,
+            )
+            speech.status = "coached"
+            speech.save(update_fields=["status"])
+
+        return ok({"coaching": SpeechCoachingSerializer(c).data}, "Coaching saved ✅")
+
     @action(detail=True, methods=["post"], url_path="upload-audio")
     def upload_audio(self, request, pk=None):
         speech = self.get_object()
@@ -454,28 +458,10 @@ class SpeechViewSet(ModelViewSet):
         if not f:
             return bad("audio_file is required", 400)
 
-        # role checks
         if kind == "student_recording" and request.user.role != "student":
             return bad("Only students can upload student recordings", 403)
-
         if kind == "teacher_coaching" and request.user.role != "teacher":
             return bad("Only teachers can upload coaching audio", 403)
-
-        # ✅ teacher coaching only for his classes or his own speech
-        if request.user.role == "teacher" and kind == "teacher_coaching":
-            teacher = request.user.teacher_profile
-            group_ids, period = get_teacher_active_groups(teacher)
-
-            # own speech OR student speech in his class
-            is_own = (speech.author_type == "teacher" and speech.teacher_id == teacher.id)
-            is_student_in_my_class = (
-                speech.author_type == "student"
-                and speech.period_id == period.id
-                and speech.group_id in group_ids
-            )
-
-            if not (is_own or is_student_in_my_class):
-                return bad("Not allowed (not your class)", 403)
 
         a = SpeechAudio.objects.create(
             speech=speech,
@@ -489,3 +475,117 @@ class SpeechViewSet(ModelViewSet):
         )
 
         return ok({"audio": SpeechAudioSerializer(a, context={"request": request}).data}, "Audio uploaded ✅")
+
+    @action(detail=True, methods=["post"], url_path="request-publish")
+    def request_publish(self, request, pk=None):
+        speech = self.get_object()
+
+        if request.user.role == "student" and (not speech.student_id or speech.student.user_id != request.user.id):
+            return bad("Not allowed", 403)
+        if request.user.role == "teacher" and (not speech.teacher_id or speech.teacher.user_id != request.user.id):
+            return bad("Not allowed", 403)
+
+        if not speech.cover_image:
+            return bad("Cover image is required to publish.", 400)
+
+        has_final_rev = speech.revisions.filter(is_final=True).exists()
+        has_final_coach = speech.coachings.filter(is_final=True).exists()
+
+        if speech.author_type == "student":
+            if not has_final_rev:
+                return bad("Teacher final correction is required before publish.", 400)
+            if not has_final_coach:
+                return bad("Teacher final coaching is required before publish.", 400)
+
+        speech.status = "pending_approval"
+        speech.save(update_fields=["status"])
+        return ok({"speech": SpeechSerializer(speech, context={"request": request}).data}, "Sent for approval ✅")
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsPrincipal], url_path="decide")
+    def decide(self, request, pk=None):
+        speech = self.get_object()
+        decision = (request.data.get("decision") or "").strip()
+        reason = (request.data.get("reason") or "").strip()
+
+        if decision not in ["approve", "reject"]:
+            return bad("decision must be approve/reject", 400)
+        if speech.status != "pending_approval":
+            return bad("Speech is not pending approval", 400)
+
+        with transaction.atomic():
+            SpeechApproval.objects.update_or_create(
+                speech=speech,
+                defaults={
+                    "decided_by": request.user,
+                    "decision": decision,
+                    "reason": reason,
+                    "decided_at": timezone.now(),
+                },
+            )
+
+            if decision == "approve":
+                speech.status = "published"
+                speech.published_at = timezone.now()
+
+                vis = (request.data.get("visibility") or "").strip()
+                if vis in ["private", "class", "school", "public"]:
+                    speech.visibility = vis
+
+                speech.save(update_fields=["status", "published_at", "visibility"])
+                msg = "Approved & Published ✅"
+            else:
+                speech.status = "rejected"
+                speech.save(update_fields=["status"])
+                msg = "Rejected ❌"
+
+        return ok({"speech": SpeechSerializer(speech, context={"request": request}).data}, msg)
+
+    # ─────────────────────────────
+    # Social actions
+    # ─────────────────────────────
+    @action(detail=True, methods=["post"], url_path="like")
+    def like(self, request, pk=None):
+        speech = self.get_object()
+        if speech.status != "published":
+            return bad("Not published", 400)
+
+        obj, created = SpeechLike.objects.get_or_create(speech=speech, user=request.user)
+        if not created:
+            obj.delete()
+            return ok({"liked": False}, "Unliked")
+        return ok({"liked": True}, "Liked")
+
+    @action(detail=True, methods=["post"], url_path="comment")
+    def comment(self, request, pk=None):
+        speech = self.get_object()
+        if speech.status != "published":
+            return bad("Not published", 400)
+
+        content = (request.data.get("content") or "").strip()
+        if not content:
+            print("Content is empty")
+            return bad("content is required", 400)
+
+        c = SpeechComment.objects.create(speech=speech, user=request.user, content=content)
+        return ok({"comment": {"id": c.id, "content": c.content}}, "Comment added ✅")
+    
+    @action(detail=True, methods=["get"], url_path="comments")
+    def comments(self, request, pk=None):
+        speech = self.get_object()
+
+        # ✅ seulement published si tu veux
+        if speech.status != "published":
+            print("Speech not published, cannot show comments")
+            return ok({"items": []}, "Not published")
+
+        qs = (SpeechComment.objects
+              .filter(speech=speech, is_hidden=False)
+              .select_related("user")
+              .order_by("-created_at")[:200])
+
+        ser = SpeechCommentSerializer(qs, many=True)
+        return ok({"items": ser.data}, "Comments")
+  
+    
+    
+    

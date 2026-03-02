@@ -346,8 +346,11 @@ class SpeechViewSet(ModelViewSet):
         qs = (self._base_qs()
             .filter(period=period, group_id__in=group_ids)
             .filter(author_type="student")
-            .filter(status__in=["submitted", "needs_revision", "pending_approval", "published"])
+            .filter(status__in=["draft","submitted", "needs_revision", "pending_approval", "published"])
             .order_by("-submitted_at", "-created_at")[:80])
+        
+        print("teacher:", teacher.id, "period:", period.id, "groups:", group_ids)
+        print("inbox qs:", qs.query)
 
         ser = SpeechSerializer(qs, many=True, context={"request": request})
         return ok({"items": ser.data}, "Teacher inbox (Speech Teacher) ✅")

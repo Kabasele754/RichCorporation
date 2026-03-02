@@ -52,7 +52,7 @@ class SpeechRevisionSerializer(serializers.ModelSerializer):
 
 class SpeechCoachingSerializer(serializers.ModelSerializer):
     teacher_name = serializers.SerializerMethodField()
-    teacher_id = serializers.IntegerField(source="teacher_id", read_only=True)
+    teacher_id = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = SpeechCoaching

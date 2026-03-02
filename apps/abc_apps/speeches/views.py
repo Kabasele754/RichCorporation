@@ -178,7 +178,7 @@ class SpeechViewSet(ModelViewSet):
             .select_related("period", "group", "group__level", "room", "student__user", "teacher__user")
             .filter(is_deleted=False)
         )
-        print("Base QS:", qs.query)
+        # print("Base QS:", qs.query)
 
         if u and u.is_authenticated:
             qs = qs.annotate(
@@ -209,6 +209,7 @@ class SpeechViewSet(ModelViewSet):
             return qs.filter(student__user=u).order_by("-created_at")
 
         if getattr(u, "role", "") == "teacher":
+            print("Filtering teacher speeches for user:", u.username)
             return qs.filter(teacher__user=u).order_by("-created_at")
 
         return qs.order_by("-created_at")

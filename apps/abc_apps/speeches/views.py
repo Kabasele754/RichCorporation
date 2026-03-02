@@ -152,6 +152,18 @@ def _apply_visibility_for_feed(qs, request):
 
     return qs.filter(base | class_q)
 
+def _is_admin(user):
+    return getattr(user, "role", "") in ["principal", "admin", "staff", "superadmin"]
+
+def _teacher_can_access_speech(teacher_profile, speech: Speech):
+    group_ids, period = get_teacher_active_groups(teacher_profile)
+    is_own = (speech.author_type == "teacher" and speech.teacher_id == teacher_profile.id)
+    is_student_in_my_class = (
+        speech.author_type == "student"
+        and speech.period_id == period.id
+        and speech.group_id in group_ids
+    )
+    return is_own or is_student_in_my_class
 
 # ─────────────────────────────────────────────
 # ViewSet
@@ -200,20 +212,32 @@ class SpeechViewSet(ModelViewSet):
     def get_queryset(self):
         """
         LIST endpoints restent filtrés par rôle (my list).
-        MAIS les actions detail (like/coach/upload-audio/add-revision/...) doivent voir tous les speeches
-        sinon get_object() retourne 404.
+        MAIS les actions detail (retrieve/like/comment/upload-audio/add-revision/coach/delete/patch/...)
+        doivent voir tous les speeches sinon get_object() retourne 404.
         """
         qs = self._base_qs()
         u = self.request.user
 
         # ✅ IMPORTANT: actions detail doivent accéder au speech cible
         detail_actions = {
+            # DRF default detail actions
             "retrieve",
+            "update", "partial_update",
+            "destroy",
+
+            # social
             "like", "comment", "comments",
-            "upload_audio",
-            "add_revision", "coach",
+
+            # workflow
             "submit", "request_publish", "decide",
+
+            # teacher tools
+            "upload_audio",
+            "add_revision", "delete_revision",
+            "coach", "delete_coaching",
+            "delete_audio",
         }
+
         if getattr(self, "action", None) in detail_actions:
             return qs.order_by("-created_at")
 
@@ -225,7 +249,7 @@ class SpeechViewSet(ModelViewSet):
             return qs.filter(teacher__user=u).order_by("-created_at")
 
         return qs.order_by("-created_at")
-   
+
     def perform_create(self, serializer):
         u = self.request.user
 
@@ -435,7 +459,73 @@ class SpeechViewSet(ModelViewSet):
             speech.save(update_fields=["status"])
 
         return ok({"revision": SpeechRevisionSerializer(rev).data}, "Correction saved ✅")
+    
+    @action(
+    detail=True,
+    methods=["delete"],
+    permission_classes=[IsAuthenticated, IsTeacher],
+    url_path=r"revisions/(?P<revision_id>[^/.]+)")
+    def delete_revision(self, request, pk=None, revision_id=None):
+        speech = self.get_object()
+        teacher = request.user.teacher_profile
 
+        # ✅ teacher must access this speech
+        if not _is_admin(request.user) and not _teacher_can_access_speech(teacher, speech):
+            return bad("Not allowed (not your class)", 403)
+
+        try:
+            rev = SpeechRevision.objects.get(id=int(revision_id), speech=speech)
+        except Exception:
+            return bad("Revision not found", 404)
+
+        # ✅ only owner or admin
+        if not _is_admin(request.user) and rev.revised_by_id != request.user.id:
+            return bad("Not allowed", 403)
+
+        rev.delete()
+
+        # (optionnel) status recalcul
+        if not speech.revisions.exists() and speech.status == "corrected":
+            speech.status = "submitted" if speech.submitted_at else "draft"
+            speech.save(update_fields=["status"])
+
+        return ok({"deleted": True, "revision_id": int(revision_id)}, "Revision deleted ✅")
+    
+    @action(
+    detail=True,
+    methods=["patch"],
+    permission_classes=[IsAuthenticated, IsTeacher],
+    url_path=r"revisions/(?P<revision_id>[^/.]+)/update"
+)
+    def update_revision(self, request, pk=None, revision_id=None):
+        speech = self.get_object()
+        teacher = request.user.teacher_profile
+
+        if not _is_admin(request.user) and not _teacher_can_access_speech(teacher, speech):
+            return bad("Not allowed (not your class)", 403)
+
+        try:
+            rev = SpeechRevision.objects.get(id=int(revision_id), speech=speech)
+        except Exception:
+            return bad("Revision not found", 404)
+
+        if not _is_admin(request.user) and rev.revised_by_id != request.user.id:
+            return bad("Not allowed", 403)
+
+        revised_content = request.data.get("revised_content", None)
+        notes = request.data.get("notes", None)
+        is_final = request.data.get("is_final", None)
+
+        if revised_content is not None:
+            rev.revised_content = str(revised_content).strip()
+        if notes is not None:
+            rev.notes = str(notes).strip()
+        if is_final is not None:
+            rev.is_final = bool(is_final)
+
+        rev.save()
+        return ok({"revision": SpeechRevisionSerializer(rev).data}, "Revision updated ✅")
+    
     @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsTeacher], url_path="coach")
     def coach(self, request, pk=None):
         speech = self.get_object()
@@ -455,6 +545,76 @@ class SpeechViewSet(ModelViewSet):
             speech.save(update_fields=["status"])
 
         return ok({"coaching": SpeechCoachingSerializer(c).data}, "Coaching saved ✅")
+    
+    @action(
+    detail=True,
+    methods=["delete"],
+    permission_classes=[IsAuthenticated, IsTeacher],
+    url_path=r"coachings/(?P<coaching_id>[^/.]+)"
+)
+    def delete_coaching(self, request, pk=None, coaching_id=None):
+        speech = self.get_object()
+        teacher = request.user.teacher_profile
+
+        if not _is_admin(request.user) and not _teacher_can_access_speech(teacher, speech):
+            return bad("Not allowed (not your class)", 403)
+
+        try:
+            c = SpeechCoaching.objects.get(id=int(coaching_id), speech=speech)
+        except Exception:
+            return bad("Coaching not found", 404)
+
+        # ✅ only owner or admin
+        # c.teacher est TeacherProfile -> compare c.teacher.user_id
+        if not _is_admin(request.user) and getattr(c.teacher, "user_id", None) != request.user.id:
+            return bad("Not allowed", 403)
+
+        c.delete()
+
+        # (optionnel) status recalcul
+        if not speech.coachings.exists() and speech.status == "coached":
+            if speech.revisions.exists():
+                speech.status = "corrected"
+            else:
+                speech.status = "submitted" if speech.submitted_at else "draft"
+            speech.save(update_fields=["status"])
+
+        return ok({"deleted": True, "coaching_id": int(coaching_id)}, "Coaching deleted ✅")
+    
+    @action(
+    detail=True,
+    methods=["patch"],
+    permission_classes=[IsAuthenticated, IsTeacher],
+    url_path=r"coachings/(?P<coaching_id>[^/.]+)/update"
+    )
+    def update_coaching(self, request, pk=None, coaching_id=None):
+        speech = self.get_object()
+        teacher = request.user.teacher_profile
+
+        if not _is_admin(request.user) and not _teacher_can_access_speech(teacher, speech):
+            return bad("Not allowed (not your class)", 403)
+
+        try:
+            c = SpeechCoaching.objects.get(id=int(coaching_id), speech=speech)
+        except Exception:
+            return bad("Coaching not found", 404)
+
+        if not _is_admin(request.user) and getattr(c.teacher, "user_id", None) != request.user.id:
+            return bad("Not allowed", 403)
+
+        notes = request.data.get("pronunciation_notes", None)
+        word_tips = request.data.get("word_tips", None)
+        is_final = request.data.get("is_final", None)
+
+        if notes is not None:
+            c.pronunciation_notes = str(notes).strip()
+        if word_tips is not None:
+            c.word_tips = word_tips if isinstance(word_tips, list) else []
+        if is_final is not None:
+            c.is_final = bool(is_final)
+
+        c.save()
+        return ok({"coaching": SpeechCoachingSerializer(c).data}, "Coaching updated ✅")
 
     @action(detail=True, methods=["post"], url_path="upload-audio")
     def upload_audio(self, request, pk=None):
@@ -484,7 +644,36 @@ class SpeechViewSet(ModelViewSet):
         )
 
         return ok({"audio": SpeechAudioSerializer(a, context={"request": request}).data}, "Audio uploaded ✅")
+    
+    @action(
+    detail=True,
+    methods=["delete"],
+    permission_classes=[IsAuthenticated],
+    url_path=r"audios/(?P<audio_id>[^/.]+)"
+)
+    def delete_audio(self, request, pk=None, audio_id=None):
+        speech = self.get_object()
 
+        # ✅ teacher can only delete audios on speech he can access
+        if request.user.role == "teacher" and not _is_admin(request.user):
+            if not _teacher_can_access_speech(request.user.teacher_profile, speech):
+                return bad("Not allowed (not your class)", 403)
+
+        try:
+            audio = SpeechAudio.objects.get(id=int(audio_id), speech=speech)
+        except Exception:
+            return bad("Audio not found", 404)
+
+        # ✅ owner or admin
+        if not _is_admin(request.user) and audio.uploaded_by_id != request.user.id:
+            return bad("Not allowed", 403)
+
+        # delete file + db
+        if audio.audio_file:
+            audio.audio_file.delete(save=False)
+        audio.delete()
+
+        return ok({"deleted": True, "audio_id": int(audio_id)}, "Audio deleted ✅")
     @action(detail=True, methods=["post"], url_path="request-publish")
     def request_publish(self, request, pk=None):
         speech = self.get_object()

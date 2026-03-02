@@ -10,10 +10,22 @@ from apps.abc_apps.speeches.models import (
 
 class SpeechAudioSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField()
+    uploaded_by_id = serializers.IntegerField(source="uploaded_by_id", read_only=True)
+    uploaded_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = SpeechAudio
-        fields = ["id", "kind", "url", "duration_sec", "created_at", "engine", "voice_name", "is_primary"]
+        fields = [
+            "id", "kind", "url", "duration_sec", "created_at",
+            "engine", "voice_name", "is_primary",
+            "uploaded_by_id", "uploaded_by_name",
+        ]
+
+    def get_uploaded_by_name(self, obj):
+        u = obj.uploaded_by
+        if not u:
+            return None
+        return (u.get_full_name() or u.email or "").strip()
 
     def get_url(self, obj):
         request = self.context.get("request")
@@ -25,10 +37,11 @@ class SpeechAudioSerializer(serializers.ModelSerializer):
 
 class SpeechRevisionSerializer(serializers.ModelSerializer):
     revised_by_name = serializers.SerializerMethodField()
+    revised_by_id = serializers.IntegerField(source="revised_by_id", read_only=True)
 
     class Meta:
         model = SpeechRevision
-        fields = ["id", "version", "revised_content", "notes", "is_final", "revised_by_name", "created_at"]
+        fields = ["id", "version", "revised_by_id", "revised_content", "notes", "is_final", "revised_by_name", "created_at"]
 
     def get_revised_by_name(self, obj):
         u = obj.revised_by
@@ -39,10 +52,11 @@ class SpeechRevisionSerializer(serializers.ModelSerializer):
 
 class SpeechCoachingSerializer(serializers.ModelSerializer):
     teacher_name = serializers.SerializerMethodField()
+    teacher_id = serializers.IntegerField(source="teacher_id", read_only=True)
 
     class Meta:
         model = SpeechCoaching
-        fields = ["id", "pronunciation_notes", "word_tips", "is_final", "teacher_name", "created_at"]
+        fields = ["id", "pronunciation_notes", "word_tips", "is_final","teacher_id",  "teacher_name", "created_at"]
 
     def get_teacher_name(self, obj):
         t = obj.teacher

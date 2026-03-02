@@ -241,18 +241,26 @@ class StudentMonthlyEnrollment(TimeStampedModel):
 
 # ✅ EXISTANT (modifié) : assignment teacher↔course
 class TeacherCourseAssignment(TimeStampedModel):
-    teacher = models.ForeignKey(TeacherProfile, on_delete=models.CASCADE, related_name="course_assignments")
-    classroom = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="teacher_assignments")
-    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="teacher_assignments")
+    teacher = models.ForeignKey(
+        TeacherProfile, on_delete=models.CASCADE, related_name="course_assignments"
+    )
+    classroom = models.ForeignKey(
+        Room, on_delete=models.CASCADE, related_name="teacher_assignments"
+    )
+    course = models.ForeignKey(
+        Course, on_delete=models.CASCADE, related_name="teacher_assignments"
+    )
 
     is_titular = models.BooleanField(default=False)
 
     start_date = models.DateField()
     end_date = models.DateField(null=True, blank=True)
 
-    # ✅ NEW
     start_time = models.TimeField(null=True, blank=True)
     end_time = models.TimeField(null=True, blank=True)
+
+    # ✅ NEW: ce teacher est responsable Speech Class pour ce groupe/période
+    is_speech_teacher = models.BooleanField(default=False)
 
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
@@ -274,24 +282,30 @@ class TeacherCourseAssignment(TimeStampedModel):
             models.Index(fields=["period", "teacher"]),
             models.Index(fields=["teacher", "start_date"]),
             models.Index(fields=["classroom", "start_date"]),
+            # ✅ utile pour les filtres speech
+            models.Index(fields=["period", "monthly_group", "is_speech_teacher"]),
         ]
-        # ⚠️ DB-level constraints for titular uniqueness (safe + strong)
         constraints = [
-            # ✅ 1 titulaire max par (period, monthly_group)
             models.UniqueConstraint(
                 fields=["period", "monthly_group"],
                 condition=Q(is_titular=True),
                 name="uniq_titular_per_group_per_period",
             ),
+            # ✅ (optionnel mais recommandé) 1 seul speech teacher par groupe/période
+            models.UniqueConstraint(
+                fields=["period", "monthly_group"],
+                condition=Q(is_speech_teacher=True),
+                name="uniq_speech_teacher_per_group_per_period",
+            ),
         ]
 
     def clean(self):
-        # ✅ time coherence
         if (self.start_time and not self.end_time) or (self.end_time and not self.start_time):
             raise ValidationError("start_time and end_time must be provided together.")
         if self.start_time and self.end_time and self.start_time >= self.end_time:
             raise ValidationError("start_time must be < end_time.")
-
+        
+        
 class MonthlyGoal(TimeStampedModel):
     month = models.CharField(max_length=7, validators=[month_validator])
     goal_text = models.TextField()

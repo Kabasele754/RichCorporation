@@ -42,3 +42,21 @@ def get_teacher_active_groups(teacher_profile):
     return group_ids, period
 
 
+def get_teacher_speech_groups(teacher_profile):
+    today = timezone.localdate()
+    period = get_or_create_period_from_date(today)
+
+    group_ids = list(
+        TeacherCourseAssignment.objects
+        .filter(
+            teacher=teacher_profile,
+            period=period,
+            is_speech_teacher=True,       # ✅ IMPORTANT
+        )
+        .exclude(monthly_group__isnull=True)
+        .values_list("monthly_group_id", flat=True)
+        .distinct()
+    )
+    return group_ids, period
+
+

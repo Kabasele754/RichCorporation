@@ -14,6 +14,7 @@ from apps.abc_apps.academics.utils import (
     get_active_enrollment_for_student,
     get_teacher_active_groups,
     get_or_create_period_from_date,
+    get_teacher_speech_groups,
 )
 from apps.abc_apps.academics.models import MonthlyClassGroup, StudentMonthlyEnrollment, TeacherCourseAssignment
 
@@ -123,7 +124,8 @@ def _class_visibility_predicate(user):
         if not teacher:
             return Q(pk__in=[])
         allowed_groups = TeacherCourseAssignment.objects.filter(
-            teacher=teacher, period=period
+            teacher=teacher, period=period,
+             is_speech_teacher=True, 
         ).values_list("monthly_group_id", flat=True)
         return Q(period=period, group_id__in=allowed_groups)
 
@@ -339,16 +341,16 @@ class SpeechViewSet(ModelViewSet):
     @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated, IsTeacher], url_path="teacher/inbox")
     def teacher_inbox(self, request):
         teacher = request.user.teacher_profile
-        group_ids, period = get_teacher_active_groups(teacher)
+        group_ids, period = get_teacher_speech_groups(teacher)   # ✅ ici
 
         qs = (self._base_qs()
-              .filter(period=period, group_id__in=group_ids)
-              .filter(author_type="student")
-              .filter(status__in=["submitted", "needs_revision", "pending_approval", "published"])
-              .order_by("-submitted_at", "-created_at")[:80])
+            .filter(period=period, group_id__in=group_ids)
+            .filter(author_type="student")
+            .filter(status__in=["submitted", "needs_revision", "pending_approval", "published"])
+            .order_by("-submitted_at", "-created_at")[:80])
 
         ser = SpeechSerializer(qs, many=True, context={"request": request})
-        return ok({"items": ser.data}, "Teacher inbox")
+        return ok({"items": ser.data}, "Teacher inbox (Speech Teacher) ✅")
 
     # ─────────────────────────────
     # Social actions (auth only)

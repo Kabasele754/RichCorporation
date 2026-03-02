@@ -210,6 +210,7 @@ class SpeechViewSet(ModelViewSet):
 
         if getattr(u, "role", "") == "teacher":
             print("Filtering teacher speeches for user:", u.username)
+            print("Base QS for teacher:", qs.query)
             return qs.filter(teacher__user=u).order_by("-created_at")
 
         return qs.order_by("-created_at")

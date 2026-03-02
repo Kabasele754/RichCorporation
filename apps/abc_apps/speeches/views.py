@@ -1,4 +1,6 @@
 # apps/abc_apps/speeches/viewsets.py
+import traceback
+
 from django.db import transaction
 from django.db.models import Count, Exists, OuterRef, Value, BooleanField, Q
 from django.utils import timezone
@@ -324,12 +326,16 @@ class SpeechViewSet(ModelViewSet):
     # ─────────────────────────────
     @action(detail=False, methods=["get"], url_path="feed")
     def feed(self, request):
-        qs = _apply_visibility_for_feed(self._base_qs(), request)
-        qs = _apply_filters(qs, request)
-        qs = qs.order_by("-published_at", "-created_at")[:50]
-        ser = SpeechSerializer(qs, many=True, context={"request": request})
-        return ok({"items": ser.data}, "Feed")
-
+        try:
+            qs = _apply_visibility_for_feed(self._base_qs(), request)
+            qs = _apply_filters(qs, request)
+            qs = qs.order_by("-published_at", "-created_at")[:50]
+            ser = SpeechSerializer(qs, many=True, context={"request": request})
+            return ok({"items": ser.data}, "Feed")
+        except Exception as e:
+            print("❌ FEED ERROR:", str(e))
+            print(traceback.format_exc())
+            return bad("Server error in feed()", 500)
     @action(detail=False, methods=["get"], url_path="month")
     def month(self, request):
         qs = _apply_visibility_for_feed(self._base_qs(), request)

@@ -220,7 +220,7 @@ class SpeechViewSet(ModelViewSet):
     def perform_create(self, serializer):
         u = self.request.user
 
-        # ✅ STUDENT: period/group/room from active enrollment
+        # ✅ STUDENT: period/group/room from active enrollment (inchangé)
         if getattr(u, "role", "") == "student":
             student = u.student_profile
             enroll, period = get_active_enrollment_for_student(student)
@@ -236,30 +236,41 @@ class SpeechViewSet(ModelViewSet):
                 period=period,
                 group=group,
                 room=room,
-                month=period.code,       # ✅ "YYYY-MM"
-                status="draft",          # ✅ draft
-                # category comes from request if provided; else default model "info"
+                month=period.code,
+                status="draft",
             )
             return
 
-        # ✅ TEACHER: must choose group (class speech)
+        # ✅ TEACHER: group from TITULAR assignment (AUTO)
         if getattr(u, "role", "") == "teacher":
             teacher = u.teacher_profile
-            group_ids, period = get_teacher_active_groups(teacher)
+            today = timezone.localdate()
+            period = get_or_create_period_from_date(today)
 
-            raw_group_id = self.request.data.get("group")
-            if not raw_group_id:
-                raise ValidationError({"group": "group is required for teacher speech."})
+            # 🔥 récupérer le groupe titulaire du teacher pour ce period
+            titular_qs = (
+                TeacherCourseAssignment.objects
+                .select_related("monthly_group__room")
+                .filter(
+                    teacher=teacher,
+                    period=period,
+                    is_titular=True,
+                )
+                .exclude(monthly_group__isnull=True)
+            )
 
-            try:
-                group_id = int(raw_group_id)
-            except Exception:
-                raise ValidationError({"group": "invalid group id"})
+            count = titular_qs.count()
+            if count == 0:
+                raise ValidationError({
+                    "detail": "You have no titular class for the current period. Cannot create a class speech."
+                })
+            if count > 1:
+                raise ValidationError({
+                    "detail": "Multiple titular classes found. Please contact admin to keep only one titular assignment."
+                })
 
-            if group_id not in group_ids:
-                raise ValidationError({"group": "You are not assigned to this group for current period."})
-
-            group = MonthlyClassGroup.objects.select_related("room").get(id=group_id)
+            assign = titular_qs.first()
+            group = assign.monthly_group
             room = group.room
 
             serializer.save(
@@ -269,12 +280,12 @@ class SpeechViewSet(ModelViewSet):
                 group=group,
                 room=room,
                 month=period.code,
-                status="draft",   # ✅ draft like student
+                status="draft",
             )
             return
 
         serializer.save(status="draft")
-
+        
     # ─────────────────────────────
     # Public/Home endpoints
     # ─────────────────────────────
@@ -349,11 +360,21 @@ class SpeechViewSet(ModelViewSet):
             .filter(status__in=["draft","submitted", "needs_revision", "pending_approval", "published"])
             .order_by("-submitted_at", "-created_at")[:80])
         
-        print("teacher:", teacher.id, "period:", period.id, "groups:", group_ids)
-        print("inbox qs:", qs.query)
 
         ser = SpeechSerializer(qs, many=True, context={"request": request})
         return ok({"items": ser.data}, "Teacher inbox (Speech Teacher) ✅")
+    
+    # ──────────────────────────────
+    # ✅ TEACHER MY (speeches of his classes)    
+    # ──────────────────────────────
+    @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated, IsTeacher], url_path="teacher/my")
+    def teacher_my(self, request):
+        teacher = request.user.teacher_profile
+        qs = (self._base_qs()
+            .filter(author_type="teacher", teacher=teacher, is_deleted=False)
+            .order_by("-created_at")[:120])
+        ser = SpeechSerializer(qs, many=True, context={"request": request})
+        return ok({"items": ser.data}, "Teacher my speeches ✅")    
 
     # ─────────────────────────────
     # Social actions (auth only)

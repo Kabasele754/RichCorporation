@@ -236,7 +236,9 @@ class SpeechViewSet(ModelViewSet):
             # teacher tools
             "upload_audio",
             "add_revision", "delete_revision",
+            "update_revision",        
             "coach", "delete_coaching",
+            "update_coaching", 
             "delete_audio",
         }
 
@@ -439,12 +441,25 @@ class SpeechViewSet(ModelViewSet):
         speech.save(update_fields=["status", "submitted_at"])
         return ok({"speech": SpeechSerializer(speech, context={"request": request}).data}, "Submitted ✅")
 
+
     @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsTeacher], url_path="add-revision")
     def add_revision(self, request, pk=None):
         speech = self.get_object()
+        teacher = request.user.teacher_profile
+
+        # ✅ sécurité: teacher doit avoir accès (admin bypass)
+        if not _is_admin(request.user) and not _teacher_can_access_speech(teacher, speech):
+            return bad("Not allowed (not your class)", 403)
+
         revised_content = (request.data.get("revised_content") or "").strip()
         notes = (request.data.get("notes") or "").strip()
         is_final = bool(request.data.get("is_final", False))
+
+        # ✅ NEW : allow updating speech fields in same call
+        new_raw_content = request.data.get("raw_content", None)   # optionnel
+        new_title = request.data.get("title", None)              # optionnel
+        new_category = request.data.get("category", None)        # optionnel
+        new_cover = request.FILES.get("cover_image", None)       # optionnel
 
         if not revised_content:
             return bad("revised_content is required", 400)
@@ -453,6 +468,7 @@ class SpeechViewSet(ModelViewSet):
         next_version = (last.version + 1) if last else 1
 
         with transaction.atomic():
+            # 1) create revision
             rev = SpeechRevision.objects.create(
                 speech=speech,
                 version=next_version,
@@ -461,10 +477,42 @@ class SpeechViewSet(ModelViewSet):
                 notes=notes,
                 is_final=is_final,
             )
-            speech.status = "corrected"
-            speech.save(update_fields=["status"])
 
-        return ok({"revision": SpeechRevisionSerializer(rev).data}, "Correction saved ✅")
+            # 2) optional speech update
+            speech_fields = []
+
+            if new_title is not None:
+                speech.title = str(new_title).strip()
+                speech_fields.append("title")
+
+            if new_category is not None:
+                speech.category = str(new_category).strip()
+                speech_fields.append("category")
+
+            if new_raw_content is not None:
+                speech.raw_content = str(new_raw_content).strip()
+                speech_fields.append("raw_content")
+
+            if new_cover is not None:
+                speech.cover_image = new_cover
+                speech_fields.append("cover_image")
+
+            # 3) status
+            if speech.status != "published":
+                speech.status = "corrected"
+                speech_fields.append("status")
+
+            # save speech only if something changed
+            if speech_fields:
+                speech.save(update_fields=list(set(speech_fields)))
+
+        return ok(
+            {
+                "revision": SpeechRevisionSerializer(rev).data,
+                "speech": SpeechSerializer(speech, context={"request": request}).data,
+            },
+            "Correction saved ✅",
+        )
     
     @action(
     detail=True,
@@ -503,6 +551,12 @@ class SpeechViewSet(ModelViewSet):
     permission_classes=[IsAuthenticated, IsTeacher],
     url_path=r"revisions/(?P<revision_id>[^/.]+)/update"
 )
+    @action(
+    detail=True,
+    methods=["patch"],
+    permission_classes=[IsAuthenticated, IsTeacher],
+    url_path=r"revisions/(?P<revision_id>[^/.]+)/update",
+)
     def update_revision(self, request, pk=None, revision_id=None):
         speech = self.get_object()
         teacher = request.user.teacher_profile
@@ -522,16 +576,53 @@ class SpeechViewSet(ModelViewSet):
         notes = request.data.get("notes", None)
         is_final = request.data.get("is_final", None)
 
-        if revised_content is not None:
-            rev.revised_content = str(revised_content).strip()
-        if notes is not None:
-            rev.notes = str(notes).strip()
-        if is_final is not None:
-            rev.is_final = bool(is_final)
+        # ✅ NEW : speech update in same call
+        new_raw_content = request.data.get("raw_content", None)
+        new_title = request.data.get("title", None)
+        new_category = request.data.get("category", None)
+        new_cover = request.FILES.get("cover_image", None)
 
-        rev.save()
-        return ok({"revision": SpeechRevisionSerializer(rev).data}, "Revision updated ✅")
-    
+        with transaction.atomic():
+            # update revision
+            rev_fields = []
+            if revised_content is not None:
+                rev.revised_content = str(revised_content).strip()
+                rev_fields.append("revised_content")
+            if notes is not None:
+                rev.notes = str(notes).strip()
+                rev_fields.append("notes")
+            if is_final is not None:
+                rev.is_final = bool(is_final)
+                rev_fields.append("is_final")
+
+            if rev_fields:
+                rev.save(update_fields=rev_fields)
+
+            # update speech (optional)
+            speech_fields = []
+            if new_title is not None:
+                speech.title = str(new_title).strip()
+                speech_fields.append("title")
+            if new_category is not None:
+                speech.category = str(new_category).strip()
+                speech_fields.append("category")
+            if new_raw_content is not None:
+                speech.raw_content = str(new_raw_content).strip()
+                speech_fields.append("raw_content")
+            if new_cover is not None:
+                speech.cover_image = new_cover
+                speech_fields.append("cover_image")
+
+            if speech_fields:
+                speech.save(update_fields=list(set(speech_fields)))
+
+        return ok(
+            {
+                "revision": SpeechRevisionSerializer(rev).data,
+                "speech": SpeechSerializer(speech, context={"request": request}).data,
+            },
+            "Revision updated ✅",
+        )
     @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsTeacher], url_path="coach")
     def coach(self, request, pk=None):
         speech = self.get_object()

@@ -91,6 +91,66 @@ class AttendanceAdminViewSet(ViewSet):
             country=request.data.get("country") or "South Africa",
         )
         return ok({"campus": SchoolCampusSerializer(campus).data}, "Campus created ✅")
+     
+     # =========================================================
+    # 🏫 CAMPUS (UPDATE GEO)
+    # =========================================================
+    @action(detail=False, methods=["post"], url_path="campus/set-geo")
+    def campus_set_geo(self, request):
+        """
+        POST /api/admin/attendance/campus/set-geo/
+        body:
+        {
+          "campus_id": 1,          # required
+          "center_lat": -26.2,     # required
+          "center_lng": 28.0,      # required
+          "radius_m": 150,         # optional (default keep current)
+          "is_active": true        # optional
+        }
+        """
+        campus_id = request.data.get("campus_id")
+        if campus_id in [None, ""]:
+            return bad("campus_id is required", 400)
+
+        campus = SchoolCampus.objects.filter(id=campus_id).first()
+        if not campus:
+            return bad("Campus not found", 404)
+
+        lat = request.data.get("center_lat")
+        lng = request.data.get("center_lng")
+
+        if lat is None or lng is None:
+            return bad("center_lat and center_lng are required", 400)
+
+        try:
+            lat_f = _to_float(lat, "center_lat")
+            lng_f = _to_float(lng, "center_lng")
+        except ValueError as e:
+            return bad(str(e), 400)
+
+        # radius optional
+        radius_m = request.data.get("radius_m")
+        if radius_m in [None, ""]:
+            radius_val = campus.radius_m
+        else:
+            try:
+                radius_val = _to_int(radius_m, "radius_m")
+            except ValueError as e:
+                return bad(str(e), 400)
+
+        if radius_val <= 0 or radius_val > 5000:
+            return bad("radius_m must be between 1 and 5000", 400)
+
+        campus.center_lat = lat_f
+        campus.center_lng = lng_f
+        campus.radius_m = radius_val
+
+        # optional is_active
+        if request.data.get("is_active") is not None:
+            campus.is_active = _to_bool(request.data.get("is_active"), campus.is_active)
+
+        campus.save()
+        return ok({"campus": SchoolCampusSerializer(campus).data}, "Campus geo updated ✅")
 
     # =========================================================
     # 🧱 ROOMS
@@ -159,6 +219,100 @@ class AttendanceAdminViewSet(ViewSet):
             is_active=is_active,
         )
         return ok({"room": RoomSerializer(room).data, "created": True}, f"Room created with code {room.code} ✅")
+    # =========================================================
+    # 🧱 ROOMS (EDIT / DELETE)
+    # =========================================================
+    @action(detail=False, methods=["post"], url_path="room/update")
+    def room_update(self, request):
+        """
+        POST /api/admin/attendance/room/update/
+        body:
+        {
+          "id": 12,                      # required
+          "code": "R7",                  # optional (si tu veux changer)
+          "campus_id": 1,                # optional
+          "name": "Room 7 - Main",
+          "capacity": 30,
+          "is_active": true
+        }
+        """
+        room_id = request.data.get("id")
+        if room_id in [None, ""]:
+            return bad("id is required", 400)
+
+        room = Room.objects.select_related("campus").filter(id=room_id).first()
+        if not room:
+            return bad("Room not found", 404)
+
+        code = (request.data.get("code") or "").strip()
+        name = (request.data.get("name") or "").strip()
+        campus_id = request.data.get("campus_id")
+        is_active = _to_bool(request.data.get("is_active"), room.is_active)
+
+        # capacity safe
+        capacity = request.data.get("capacity")
+        if capacity not in [None, ""]:
+            try:
+                capacity = int(capacity)
+            except Exception:
+                return bad("Invalid capacity", 400)
+        else:
+            capacity = None
+
+        if name == "":
+            return bad("name is required", 400)
+
+        campus = None
+        if campus_id not in [None, ""]:
+            campus = SchoolCampus.objects.filter(id=campus_id).first()
+            if not campus:
+                return bad("Campus not found", 404)
+
+        # ✅ si code change => vérifier unicité
+        if code and code != room.code:
+            if Room.objects.filter(code=code).exclude(id=room.id).exists():
+                return bad("Room code already exists", 409)
+            room.code = code
+
+        room.name = name
+        room.capacity = capacity
+        room.is_active = is_active
+        room.campus = campus
+
+        room.save()
+        return ok({"room": RoomSerializer(room).data}, "Room updated ✅")
+
+    @action(detail=False, methods=["post"], url_path="room/delete")
+    def room_delete(self, request):
+        """
+        POST /api/admin/attendance/room/delete/
+        body:
+        {
+          "id": 12,
+          "hard": false     # default false => soft delete (is_active=false)
+        }
+        """
+        room_id = request.data.get("id")
+        if room_id in [None, ""]:
+            return bad("id is required", 400)
+
+        hard = _to_bool(request.data.get("hard"), False)
+
+        room = Room.objects.filter(id=room_id).first()
+        if not room:
+            return bad("Room not found", 404)
+
+        # ✅ delete tag aussi si hard delete
+        if hard:
+            with transaction.atomic():
+                RoomScanTag.objects.filter(room=room).delete()
+                room.delete()
+            return ok({"deleted": True, "hard": True}, "Room deleted permanently ✅")
+
+        # soft delete
+        room.is_active = False
+        room.save(update_fields=["is_active"])
+        return ok({"deleted": True, "hard": False}, "Room disabled ✅")
 
     # =========================================================
     # 📍 TAG GEO: create/update + payload + PNG

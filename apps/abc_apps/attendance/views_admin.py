@@ -405,6 +405,11 @@ class AttendanceAdminViewSet(ViewSet):
 
         radius_m = request.data.get("radius_m", 30)
         accuracy_m = request.data.get("accuracy_m", 0)
+        accuracy_m = _to_int(accuracy_m, "accuracy_m")
+
+        # ✅ indoor tolerance (safe)
+        tol = max(50, min(int(accuracy_m or 0) * 5, 500))  # 50..500
+        ok_in, dist_m, allowed_m = is_within_campus(room.campus, lat_f, lng_f, extra_m=tol)
         return_png = _to_bool(request.data.get("return_png"), True)
 
         try:

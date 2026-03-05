@@ -30,24 +30,22 @@ def is_within_room_tag(tag, lat: float, lng: float, extra_m: float = 0.0):
 # =========================================================
 # GEO: Campus (avec tolérance)
 # =========================================================
-def is_within_campus(campus, lat: float, lng: float, extra_m: float = 0.0):
+def is_within_campus(campus, lat: float, lng: float, extra_m: float = 0):
     """
-    Retourne (ok, distance_m, allowed_m)
-
-    ✅ Si campus n'a pas de geo (center/radius), on NE BLOQUE PAS.
-    ✅ extra_m = tolérance GPS (accuracy).
+    Returns (ok, dist_m, allowed_m)
     """
-    if not campus:
-        return True, None, None
-
-    if campus.center_lat is None or campus.center_lng is None or campus.radius_m is None:
-        return True, None, None  # ✅ campus geo not set => no block
+    if campus.center_lat is None or campus.center_lng is None:
+        # if campus has no geo configured -> don't block
+        return True, 0.0, 0.0
 
     dist = haversine_m(
         float(campus.center_lat),
         float(campus.center_lng),
-        float(lat),
-        float(lng),
+        lat,
+        lng,
     )
-    allowed = float(campus.radius_m) + float(extra_m or 0.0)
-    return (dist <= allowed), dist, allowed
+
+    base = float(campus.radius_m or 0)
+    allowed = base + float(extra_m or 0)
+    return dist <= allowed, dist, allowed
+

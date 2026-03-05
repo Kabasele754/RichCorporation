@@ -341,6 +341,7 @@ class AttendanceAdminViewSet(ViewSet):
      # =========================================================
     # 📍 TAG GEO: create/update + payload + PNG
     # =========================================================
+
     @action(detail=False, methods=["post"], url_path="room-tag/set-geo")
     def set_room_tag_geo(self, request):
         room_code = (request.data.get("room_code") or "").strip()
@@ -383,9 +384,6 @@ class AttendanceAdminViewSet(ViewSet):
         if not room:
             return bad("Room not found", 404)
 
-        # --------------------------
-        # lat/lng required
-        # --------------------------
         lat = request.data.get("lat")
         lng = request.data.get("lng")
         if lat is None or lng is None:
@@ -394,7 +392,7 @@ class AttendanceAdminViewSet(ViewSet):
         radius_m = request.data.get("radius_m", 30)
         return_png = _to_bool(request.data.get("return_png"), True)
 
-        # ✅ NEW: accuracy tolerance (GPS)
+        # ✅ NEW: accuracy tolerance
         accuracy_m = request.data.get("accuracy_m", 0)
 
         try:
@@ -408,32 +406,19 @@ class AttendanceAdminViewSet(ViewSet):
         if radius_m <= 0 or radius_m > 500:
             return bad("radius_m must be between 1 and 500", 400)
 
-        # ✅ clamp tolerance (indoor GPS can be crazy)
-        #   - keep max 200m extra to avoid abuse
+        # ✅ clamp (avoid abuse)
         tol = max(0, min(int(accuracy_m or 0), 200))
 
-        # --------------------------
-        # ✅ Security: must be inside campus (with tolerance)
-        # --------------------------
+        # ✅ Security: must be inside campus (but safe if campus geo missing)
         if room.campus:
-            ok_in, dist_m, allowed_m = is_within_campus(
-                room.campus,
-                lat_f,
-                lng_f,
-                extra_m=tol,
-            )
-
+            ok_in, dist_m, allowed_m = is_within_campus(room.campus, lat_f, lng_f, extra_m=tol)
             if not ok_in:
-                # message clair (pratique pour debug)
                 return bad(
                     f"You must be inside campus to set room geo "
-                    f"(dist={dist_m:.1f}m / allowed={allowed_m:.1f}m, GPS±{tol}m)",
+                    f"(dist={dist_m:.1f}m allowed={allowed_m:.1f}m GPS±{tol}m)",
                     403,
                 )
 
-        # --------------------------
-        # Save/update tag
-        # --------------------------
         with transaction.atomic():
             tag, created = RoomScanTag.objects.get_or_create(room=room)
             tag.latitude = lat_f
@@ -442,7 +427,6 @@ class AttendanceAdminViewSet(ViewSet):
             tag.is_active = True
             tag.save()
 
-        # ✅ payload v2 signé ABCR|ROOM|room|tag|sig
         payload = make_room_qr(room.code, str(tag.id))
 
         data = {
@@ -450,19 +434,15 @@ class AttendanceAdminViewSet(ViewSet):
             "tag": RoomScanTagSerializer(tag).data,
             "payload": payload,
             "created": created,
+            "security": {
+                "gps_accuracy_m": tol,
+                "campus_geo_present": bool(room.campus and room.campus.center_lat is not None),
+            }
         }
-
         if return_png:
             data["qr_png_base64"] = _png_base64_from_payload(payload)
 
-        # ✅ Bonus debug (optionnel)
-        data["security"] = {
-            "gps_accuracy_m": tol,
-            "campus_checked": bool(room.campus_id),
-        }
-
         return ok(data, "Room tag geo saved ✅")
-    
     
     @action(detail=False, methods=["get"], url_path="room-tag/print")
     def room_tag_print(self, request):

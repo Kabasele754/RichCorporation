@@ -15,7 +15,7 @@ def _next_room_code_global() -> str:
             max_n = max(max_n, int(m.group(1)))
     return f"R{max_n + 1}"
 
-def create_room_auto_code(*, campus: Optional[SchoolCampus], name: str, capacity=None, is_active=True) -> Room:
+def create_room_auto_code(*, campus: Optional[SchoolCampus], name: str, capacity=None, is_active=True, building=None, floor=0   ) -> Room:
     """
     Crée une room avec code auto (retry si collision).
     Compatible Python < 3.10
@@ -30,6 +30,8 @@ def create_room_auto_code(*, campus: Optional[SchoolCampus], name: str, capacity
                     name=name,
                     capacity=capacity,
                     is_active=is_active,
+                    building=building,
+                    floor=floor,
                 )
         except IntegrityError:
             continue

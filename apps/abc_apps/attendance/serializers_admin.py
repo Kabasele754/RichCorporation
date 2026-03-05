@@ -18,10 +18,9 @@ class RoomSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Room
-        fields = ["id", "code", "name", "capacity", "is_active", "campus", "campus_name",  "building",
-            "floor",      ]
-    def get_campus_name(self, obj):
-        return obj.campus.name if obj.campus else None
+        fields = ["id", "code", "name", "capacity", "is_active", "campus", "campus_name",  "building","floor"]
+    # def get_campus_name(self, obj):
+    #     return obj.campus.name if obj.campus else None
 
 
 class RoomScanTagSerializer(serializers.ModelSerializer):

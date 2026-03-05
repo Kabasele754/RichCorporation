@@ -17,7 +17,7 @@ from apps.common.permissions import IsSecretary
 from .models import RoomScanTag
 from .qr import make_room_qr
 from .serializers_admin import SchoolCampusSerializer, RoomSerializer, RoomScanTagSerializer
-from .utils_rooms import create_room_auto_code
+from .utils_rooms import create_room_auto_code 
 
 
 def _png_base64_from_payload(payload: str) -> str:
@@ -165,9 +165,6 @@ class AttendanceAdminViewSet(ViewSet):
 
     @action(detail=False, methods=["post"], url_path="room/create")
     def room_create(self, request):
-        """
-        IMPORTANT: appeler /room/create/ (avec slash final)
-        """
         code = (request.data.get("code") or "").strip()
         name = (request.data.get("name") or "").strip()
         if not name:
@@ -180,7 +177,7 @@ class AttendanceAdminViewSet(ViewSet):
             if not campus:
                 return bad("Campus not found", 404)
 
-        # capacity safe
+        # capacity
         capacity = request.data.get("capacity")
         if capacity not in [None, ""]:
             try:
@@ -191,17 +188,18 @@ class AttendanceAdminViewSet(ViewSet):
             capacity = None
 
         is_active = _to_bool(request.data.get("is_active"), True)
-        
+
+        # ✅ building / floor (si ton modèle les a)
         building = (request.data.get("building") or "").strip() or None
 
         floor = request.data.get("floor", 0)
         try:
-                floor = int(floor)
+            floor = int(floor)
         except Exception:
-                return bad("Invalid floor", 400)
+            return bad("Invalid floor", 400)
 
-        if floor < -5 or floor > 200:
-                return bad("floor out of range", 400)
+        if floor < 0 or floor > 3:   # ✅ 4 floors = 0..3
+            return bad("floor out of range (0..3)", 400)
 
         # ✅ code fourni
         if code:
@@ -212,9 +210,9 @@ class AttendanceAdminViewSet(ViewSet):
                     "name": name,
                     "capacity": capacity,
                     "is_active": is_active,
-                        "building": building,
-                        "floor": floor,
-                }
+                    "building": building,
+                    "floor": floor,
+                },
             )
             if not created:
                 room.campus = campus
@@ -224,6 +222,7 @@ class AttendanceAdminViewSet(ViewSet):
                 room.building = building
                 room.floor = floor
                 room.save()
+
             return ok({"room": RoomSerializer(room).data, "created": created}, "Room saved ✅")
 
         # ✅ auto code
@@ -236,6 +235,7 @@ class AttendanceAdminViewSet(ViewSet):
             floor=floor,
         )
         return ok({"room": RoomSerializer(room).data, "created": True}, f"Room created with code {room.code} ✅")
+    
     # =========================================================
     # 🧱 ROOMS (EDIT / DELETE)
     # =========================================================
@@ -245,12 +245,13 @@ class AttendanceAdminViewSet(ViewSet):
         POST /api/admin/attendance/room/update/
         body:
         {
-          "id": 12,                      # required
-          "code": "R7",                  # optional (si tu veux changer)
-          "campus_id": 1,                # optional
-          "name": "Room 7 - Main",
-          "capacity": 30,
-          "is_active": true
+        "id": 12,                      # required
+        "campus_id": 1,                # optional
+        "name": "Room 7 - Main",
+        "capacity": 30,
+        "is_active": true,
+        "building": "Main Building",   # optional
+        "floor": 2                     # optional
         }
         """
         room_id = request.data.get("id")
@@ -261,19 +262,24 @@ class AttendanceAdminViewSet(ViewSet):
         if not room:
             return bad("Room not found", 404)
 
-        code = (request.data.get("code") or "").strip()
         name = (request.data.get("name") or "").strip()
+        if not name:
+            return bad("name is required", 400)
+
         campus_id = request.data.get("campus_id")
         is_active = _to_bool(request.data.get("is_active"), room.is_active)
+
         building = (request.data.get("building") or "").strip() or None
 
         floor = request.data.get("floor", room.floor)
         try:
-                floor = int(floor)
+            floor = int(floor)
         except Exception:
-                return bad("Invalid floor", 400)
+            return bad("Invalid floor", 400)
 
-        # capacity safe
+        if floor < -5 or floor > 200:
+            return bad("floor out of range", 400)
+
         capacity = request.data.get("capacity")
         if capacity not in [None, ""]:
             try:
@@ -283,33 +289,22 @@ class AttendanceAdminViewSet(ViewSet):
         else:
             capacity = None
 
-        if name == "":
-            return bad("name is required", 400)
-
         campus = None
         if campus_id not in [None, ""]:
             campus = SchoolCampus.objects.filter(id=campus_id).first()
             if not campus:
                 return bad("Campus not found", 404)
 
-        # ✅ si code change => vérifier unicité
-        if code and code != room.code:
-            if Room.objects.filter(code=code).exclude(id=room.id).exists():
-                return bad("Room code already exists", 409)
-            room.code = code
-        
-        
-
+        # ✅ code non modifiable
         room.name = name
         room.capacity = capacity
         room.is_active = is_active
         room.campus = campus
         room.building = building
         room.floor = floor
-
         room.save()
-        return ok({"room": RoomSerializer(room).data}, "Room updated ✅")
 
+        return ok({"room": RoomSerializer(room).data}, "Room updated ✅")
     @action(detail=False, methods=["post"], url_path="room/delete")
     def room_delete(self, request):
         """

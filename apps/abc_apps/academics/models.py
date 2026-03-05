@@ -118,26 +118,27 @@ class AcademicLevel(TimeStampedModel):
 # ─────────────────────────────────────────────
 class Room(TimeStampedModel):
     campus = models.ForeignKey(
-    SchoolCampus,
-    on_delete=models.PROTECT,
-    related_name="rooms",
-    null=True,
-    blank=True,
-)
+        SchoolCampus,
+        on_delete=models.PROTECT,
+        related_name="rooms",
+        null=True,
+        blank=True,
+    )
 
-    # ex: "R1", "R2", "LAB-A"
     code = models.CharField(max_length=20, unique=True)
-    # ex: "Room 2 - Main Building"
     name = models.CharField(max_length=120)
     capacity = models.PositiveIntegerField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
+
+    # ✅ NEW
+    building = models.CharField(max_length=80, null=True, blank=True)  # ex: "Main Building"
+    floor = models.SmallIntegerField(default=0)  # ex: 0=RDC, 1=1st, 2=2nd...
 
     class Meta:
         ordering = ["code"]
 
     def __str__(self) -> str:
         return f"{self.code} • {self.name}"
-
 
 class ClassRoom(TimeStampedModel):
     name = models.CharField(max_length=120)

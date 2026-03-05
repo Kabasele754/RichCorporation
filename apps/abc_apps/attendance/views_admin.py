@@ -191,6 +191,17 @@ class AttendanceAdminViewSet(ViewSet):
             capacity = None
 
         is_active = _to_bool(request.data.get("is_active"), True)
+        
+        building = (request.data.get("building") or "").strip() or None
+
+        floor = request.data.get("floor", 0)
+        try:
+                floor = int(floor)
+        except Exception:
+                return bad("Invalid floor", 400)
+
+        if floor < -5 or floor > 200:
+                return bad("floor out of range", 400)
 
         # ✅ code fourni
         if code:
@@ -201,6 +212,8 @@ class AttendanceAdminViewSet(ViewSet):
                     "name": name,
                     "capacity": capacity,
                     "is_active": is_active,
+                        "building": building,
+                        "floor": floor,
                 }
             )
             if not created:
@@ -208,6 +221,8 @@ class AttendanceAdminViewSet(ViewSet):
                 room.name = name
                 room.capacity = capacity
                 room.is_active = is_active
+                room.building = building
+                room.floor = floor
                 room.save()
             return ok({"room": RoomSerializer(room).data, "created": created}, "Room saved ✅")
 
@@ -217,6 +232,8 @@ class AttendanceAdminViewSet(ViewSet):
             name=name,
             capacity=capacity,
             is_active=is_active,
+            building=building,
+            floor=floor,
         )
         return ok({"room": RoomSerializer(room).data, "created": True}, f"Room created with code {room.code} ✅")
     # =========================================================
@@ -248,6 +265,13 @@ class AttendanceAdminViewSet(ViewSet):
         name = (request.data.get("name") or "").strip()
         campus_id = request.data.get("campus_id")
         is_active = _to_bool(request.data.get("is_active"), room.is_active)
+        building = (request.data.get("building") or "").strip() or None
+
+        floor = request.data.get("floor", room.floor)
+        try:
+                floor = int(floor)
+        except Exception:
+                return bad("Invalid floor", 400)
 
         # capacity safe
         capacity = request.data.get("capacity")
@@ -273,11 +297,15 @@ class AttendanceAdminViewSet(ViewSet):
             if Room.objects.filter(code=code).exclude(id=room.id).exists():
                 return bad("Room code already exists", 409)
             room.code = code
+        
+        
 
         room.name = name
         room.capacity = capacity
         room.is_active = is_active
         room.campus = campus
+        room.building = building
+        room.floor = floor
 
         room.save()
         return ok({"room": RoomSerializer(room).data}, "Room updated ✅")

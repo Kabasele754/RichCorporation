@@ -1,3 +1,4 @@
+# apps/attendance/views_admin.py (ou attendance/admin_views.py)
 import base64
 from io import BytesIO
 
@@ -9,10 +10,8 @@ from rest_framework.permissions import IsAuthenticated
 
 from apps.abc_apps.accounts.views import bad
 from apps.abc_apps.commons.responses import ok
-
 from apps.abc_apps.academics.models import Room, SchoolCampus
 from apps.abc_apps.attendance.geo import is_within_campus
-from apps.common.permissions import IsSecretary
 from apps.common.permissions import IsSecretary
 
 from .models import RoomScanTag
@@ -52,13 +51,6 @@ def _to_int(v, name):
 
 
 class AttendanceAdminViewSet(ViewSet):
-    """
-    ✅ Secrétaire manage:
-    - Campus create/list
-    - Room create/list (code auto si absent)
-    - Tag geo set/update (GPS + radius)
-    - Payload QR/NFC + PNG base64 pour impression
-    """
     permission_classes = [IsAuthenticated, IsSecretary]
 
     # =========================================================
@@ -105,9 +97,6 @@ class AttendanceAdminViewSet(ViewSet):
     # =========================================================
     @action(detail=False, methods=["get"], url_path="rooms")
     def rooms_list(self, request):
-        """
-        GET /api/admin/attendance/rooms/?campus_id=1
-        """
         campus_id = request.query_params.get("campus_id")
         qs = Room.objects.all().order_by("code")
         if campus_id:
@@ -117,15 +106,7 @@ class AttendanceAdminViewSet(ViewSet):
     @action(detail=False, methods=["post"], url_path="room/create")
     def room_create(self, request):
         """
-        POST /api/admin/attendance/room/create/
-        body:
-        {
-          "code": "R7",            # optionnel (si absent => auto)
-          "campus_id": 1,          # optionnel
-          "name": "Room 7 - Main Building",
-          "capacity": 30,
-          "is_active": true
-        }
+        IMPORTANT: appeler /room/create/ (avec slash final)
         """
         code = (request.data.get("code") or "").strip()
         name = (request.data.get("name") or "").strip()
@@ -134,15 +115,24 @@ class AttendanceAdminViewSet(ViewSet):
 
         campus_id = request.data.get("campus_id")
         campus = None
-        if campus_id:
+        if campus_id not in [None, ""]:
             campus = SchoolCampus.objects.filter(id=campus_id).first()
             if not campus:
                 return bad("Campus not found", 404)
 
+        # capacity safe
         capacity = request.data.get("capacity")
+        if capacity not in [None, ""]:
+            try:
+                capacity = int(capacity)
+            except Exception:
+                return bad("Invalid capacity", 400)
+        else:
+            capacity = None
+
         is_active = _to_bool(request.data.get("is_active"), True)
 
-        # ✅ code fourni => create/update (logique simple)
+        # ✅ code fourni
         if code:
             room, created = Room.objects.get_or_create(
                 code=code,
@@ -161,7 +151,7 @@ class AttendanceAdminViewSet(ViewSet):
                 room.save()
             return ok({"room": RoomSerializer(room).data, "created": created}, "Room saved ✅")
 
-        # ✅ code absent => auto génération R{n}
+        # ✅ auto code
         room = create_room_auto_code(
             campus=campus,
             name=name,
@@ -175,23 +165,6 @@ class AttendanceAdminViewSet(ViewSet):
     # =========================================================
     @action(detail=False, methods=["post"], url_path="room-tag/set-geo")
     def set_room_tag_geo(self, request):
-        """
-        POST /api/admin/attendance/room-tag/set-geo/
-        body:
-        {
-          "room_code": "R7",
-          "lat": -26.2,
-          "lng": 28.0,
-          "radius_m": 30,
-          "return_png": true,
-
-          # optionnel: si room n'existe pas => créer
-          "auto_create_room": true,
-          "campus_id": 1,
-          "name": "Room 7 - Main Building",
-          "capacity": 30
-        }
-        """
         room_code = (request.data.get("room_code") or "").strip()
         if not room_code:
             return bad("room_code is required", 400)
@@ -201,7 +174,7 @@ class AttendanceAdminViewSet(ViewSet):
 
         room = Room.objects.select_related("campus").filter(code=room_code).first()
 
-        # ✅ si room absent et auto_create_room=True => créer
+        # ✅ auto create si absent
         if not room and auto_create_room:
             if not campus_id:
                 return bad("campus_id is required to auto_create_room", 400)
@@ -210,7 +183,15 @@ class AttendanceAdminViewSet(ViewSet):
                 return bad("Campus not found", 404)
 
             name = (request.data.get("name") or "").strip() or room_code
+
             capacity = request.data.get("capacity")
+            if capacity not in [None, ""]:
+                try:
+                    capacity = int(capacity)
+                except Exception:
+                    return bad("Invalid capacity", 400)
+            else:
+                capacity = None
 
             room = Room.objects.create(
                 code=room_code,
@@ -253,12 +234,13 @@ class AttendanceAdminViewSet(ViewSet):
             tag.is_active = True
             tag.save()
 
+        # ✅ payload v2 signé ABCR|ROOM|room|tag|sig
         payload = make_room_qr(room.code, str(tag.id))
 
         data = {
             "room": RoomSerializer(room).data,
             "tag": RoomScanTagSerializer(tag).data,
-            "payload": payload,  # ✅ à imprimer en QR + écrire en NFC
+            "payload": payload,
             "created": created,
         }
         if return_png:
@@ -268,9 +250,6 @@ class AttendanceAdminViewSet(ViewSet):
 
     @action(detail=False, methods=["get"], url_path="room-tag/print")
     def room_tag_print(self, request):
-        """
-        GET /api/admin/attendance/room-tag/print/?room_code=R7&png=1
-        """
         room_code = (request.query_params.get("room_code") or "").strip()
         if not room_code:
             return bad("room_code is required", 400)
@@ -297,10 +276,6 @@ class AttendanceAdminViewSet(ViewSet):
 
     @action(detail=False, methods=["post"], url_path="room-tag/toggle")
     def room_tag_toggle(self, request):
-        """
-        POST /api/admin/attendance/room-tag/toggle/
-        body: { "room_code": "R7", "is_active": true }
-        """
         room_code = (request.data.get("room_code") or "").strip()
         if not room_code:
             return bad("room_code is required", 400)

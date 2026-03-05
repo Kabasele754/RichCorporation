@@ -4,6 +4,8 @@ from .models import RoomScanTag
 
 
 class SchoolCampusSerializer(serializers.ModelSerializer):
+    center_lat = serializers.FloatField()
+    center_lng = serializers.FloatField()
     address_full = serializers.CharField(read_only=True)
 
     class Meta:

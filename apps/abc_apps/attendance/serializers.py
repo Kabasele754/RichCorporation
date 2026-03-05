@@ -1,6 +1,6 @@
 # apps/attendance/serializers.py
 from rest_framework import serializers
-from .models import DailyRoomCheckIn, DailyRoomCheckInApproval, StudentExamEntry, ReenrollmentIntent
+from .models import DailyRoomCheckIn, DailyRoomCheckInApproval, StudentExamEntry, ReenrollmentIntent, TeacherCheckIn
 from datetime import datetime
 from django.utils import timezone
 
@@ -127,3 +127,11 @@ class ReenrollmentIntentSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = ["status", "decided_by", "decided_at", "created_at"]
+
+
+
+
+class TeacherCheckInSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TeacherCheckIn
+        fields = "__all__"

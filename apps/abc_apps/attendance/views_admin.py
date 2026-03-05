@@ -348,27 +348,22 @@ class AttendanceAdminViewSet(ViewSet):
     @action(detail=False, methods=["post"], url_path="room-tag/set-geo")
     def set_room_tag_geo(self, request):
         room_code = (request.data.get("room_code") or "").strip()
-        logger.info("[set_room_tag_geo] start room_code=%s user=%s data=%s",
-                    room_code, getattr(request.user, "username", None), dict(request.data))
+        print(f"[set_room_tag_geo] start room_code={room_code} user={getattr(request.user,'username',None)} data={dict(request.data)}")
 
         if not room_code:
-            logger.warning("[set_room_tag_geo] missing room_code")
             return bad("room_code is required", 400)
 
         auto_create_room = _to_bool(request.data.get("auto_create_room"), False)
         campus_id = request.data.get("campus_id")
 
         room = Room.objects.select_related("campus").filter(code=room_code).first()
-        logger.info("[set_room_tag_geo] room_found=%s campus_id=%s auto_create=%s",
-                    bool(room), campus_id, auto_create_room)
+        print(f"[set_room_tag_geo] room_found={bool(room)} campus_id={campus_id} auto_create={auto_create_room}")
 
+        # auto create si absent
         if not room and auto_create_room:
             if not campus_id:
-                logger.warning("[set_room_tag_geo] auto_create requested but campus_id missing")
                 return bad("campus_id is required to auto_create_room", 400)
-
             campus = SchoolCampus.objects.filter(id=campus_id).first()
-            logger.info("[set_room_tag_geo] auto_create campus_found=%s", bool(campus))
             if not campus:
                 return bad("Campus not found", 404)
 
@@ -379,7 +374,6 @@ class AttendanceAdminViewSet(ViewSet):
                 try:
                     capacity = int(capacity)
                 except Exception:
-                    logger.exception("[set_room_tag_geo] invalid capacity=%s", capacity)
                     return bad("Invalid capacity", 400)
             else:
                 capacity = None
@@ -391,26 +385,22 @@ class AttendanceAdminViewSet(ViewSet):
                 capacity=capacity,
                 is_active=True,
             )
-            logger.info("[set_room_tag_geo] auto_created room_id=%s", room.id)
 
         if not room:
-            logger.warning("[set_room_tag_geo] room not found code=%s", room_code)
             return bad("Room not found", 404)
 
+        # -------------------------
+        # ✅ Parse lat/lng BEFORE using lat_f
+        # -------------------------
         lat = request.data.get("lat")
         lng = request.data.get("lng")
         if lat is None or lng is None:
-            logger.warning("[set_room_tag_geo] missing lat/lng lat=%s lng=%s", lat, lng)
             return bad("lat and lng are required", 400)
 
         radius_m = request.data.get("radius_m", 30)
-        accuracy_m = request.data.get("accuracy_m", 0)
-        accuracy_m = _to_int(accuracy_m, "accuracy_m")
-
-        # ✅ indoor tolerance (safe)
-        tol = max(50, min(int(accuracy_m or 0) * 5, 500))  # 50..500
-        ok_in, dist_m, allowed_m = is_within_campus(room.campus, lat_f, lng_f, extra_m=tol)
         return_png = _to_bool(request.data.get("return_png"), True)
+
+        accuracy_m = request.data.get("accuracy_m", 0)
 
         try:
             lat_f = _to_float(lat, "lat")
@@ -418,38 +408,33 @@ class AttendanceAdminViewSet(ViewSet):
             radius_m = _to_int(radius_m, "radius_m")
             accuracy_m = _to_int(accuracy_m, "accuracy_m")
         except ValueError as e:
-            logger.warning("[set_room_tag_geo] parse error: %s", str(e))
             return bad(str(e), 400)
 
-        tol = max(0, min(int(accuracy_m or 0), 200))
-        logger.info("[set_room_tag_geo] parsed lat=%s lng=%s radius=%s accuracy=%s tol=%s",
-                    lat_f, lng_f, radius_m, accuracy_m, tol)
-
         if radius_m <= 0 or radius_m > 500:
-            logger.warning("[set_room_tag_geo] radius out of range radius=%s", radius_m)
             return bad("radius_m must be between 1 and 500", 400)
 
-        # ✅ SECURITY CHECK
+        # -------------------------
+        # ✅ Campus security check (with indoor tolerance)
+        # -------------------------
+        tol = max(50, min(int(accuracy_m or 0) * 5, 500))  # 50..500
+
         if room.campus:
-            campus = room.campus
-            logger.info("[set_room_tag_geo] campus geo center=(%s,%s) radius=%s",
-                        getattr(campus, "center_lat", None),
-                        getattr(campus, "center_lng", None),
-                        getattr(campus, "radius_m", None))
-
-            ok_in, dist_m, allowed_m = is_within_campus(campus, lat_f, lng_f, extra_m=tol)
-
-            logger.warning("[set_room_tag_geo] within_campus=%s dist=%s allowed=%s tol=%s campus_id=%s",
-                        ok_in, dist_m, allowed_m, tol, campus.id)
-
+            ok_in, dist_m, allowed_m = is_within_campus(room.campus, lat_f, lng_f, extra_m=tol)
+            print(
+                f"[set_room_tag_geo] parsed lat={lat_f} lng={lng_f} radius={radius_m} accuracy={accuracy_m} tol={tol}"
+            )
+            print(
+                f"[set_room_tag_geo] campus geo center=({room.campus.center_lat},{room.campus.center_lng}) radius={room.campus.radius_m}"
+            )
+            print(
+                f"[set_room_tag_geo] within_campus={ok_in} dist={dist_m} allowed={allowed_m} tol={tol} campus_id={room.campus.id}"
+            )
             if not ok_in:
-                # ✅ return FULL debug msg in response too
-                return bad(
-                    f"You must be inside campus to set room geo "
-                    f"(dist={dist_m:.1f}m allowed={allowed_m:.1f}m GPS±{tol}m)",
-                    403,
-                )
+                return bad("You must be inside campus to set room geo", 403)
 
+        # -------------------------
+        # ✅ Save tag
+        # -------------------------
         with transaction.atomic():
             tag, created = RoomScanTag.objects.get_or_create(room=room)
             tag.latitude = lat_f
@@ -469,9 +454,8 @@ class AttendanceAdminViewSet(ViewSet):
         if return_png:
             data["qr_png_base64"] = _png_base64_from_payload(payload)
 
-        logger.info("[set_room_tag_geo] success room=%s tag=%s created=%s", room.code, tag.id, created)
         return ok(data, "Room tag geo saved ✅")
-    
+
     @action(detail=False, methods=["get"], url_path="room-tag/print")
     def room_tag_print(self, request):
         room_code = (request.query_params.get("room_code") or "").strip()

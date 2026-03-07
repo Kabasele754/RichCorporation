@@ -824,14 +824,18 @@ class StudentAttendanceViewSet(ViewSet):
         current = (
             StudentMonthlyEnrollment.objects
             .select_related("group")
-            .filter(student=student, period=from_period)
+            .filter(student=student, period=from_period, status="active")
             .first()
         )
         if not current:
             return bad("No current enrollment", 403)
 
+        # ✅ date logique d’exécution
+        # exemple: lendemain de fin de période
+        execute_after = from_period.end_date + timedelta(days=1)
+
         with transaction.atomic():
-            intent, _ = ReenrollmentIntent.objects.update_or_create(
+            intent, created = ReenrollmentIntent.objects.update_or_create(
                 student=student,
                 to_period=to_period,
                 defaults={
@@ -839,27 +843,18 @@ class StudentAttendanceViewSet(ViewSet):
                     "will_return": will_return,
                     "reason": reason,
                     "status": "pending",
+                    "execute_after": execute_after,   # ✅ nouveau champ conseillé
                 },
             )
-
-            next_enroll_id = None
-            if will_return:
-                next_enroll, _ = StudentMonthlyEnrollment.objects.get_or_create(
-                    student=student,
-                    period=to_period,
-                    group=current.group,
-                    defaults={"status": "pending"},
-                )
-                next_enroll_id = next_enroll.id
 
         return ok(
             {
                 "intent": ReenrollmentIntentSerializer(intent).data,
-                "pending_enrollment_id": next_enroll_id,
+                "scheduled_for": str(execute_after),
+                "will_return": will_return,
             },
-            "Reenrollment saved ✅",
+            "Reenrollment intent saved ✅",
         )
-
     # =====================================================
     # HISTORY
     # =====================================================

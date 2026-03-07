@@ -159,6 +159,9 @@ class ReenrollmentIntent(TimeStampedModel):
 
     decided_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
     decided_at = models.DateTimeField(null=True, blank=True)
+    
+    execute_after = models.DateField(null=True, blank=True)   # ✅ NEW
+    processed_at = models.DateTimeField(null=True, blank=True) # ✅ NEW
 
     class Meta:
         constraints = [

@@ -500,116 +500,197 @@ class StudentAttendanceViewSet(ViewSet):
     @action(detail=False, methods=["post"], url_path="scan-exam")
     def scan_exam(self, request):
         student = request.user.student_profile
-
         qr_raw = (request.data.get("qr_data") or "").strip()
         course_id = request.data.get("course_id", None)
 
+        print(f"[scan_exam] start student={student.id} qr_raw={qr_raw} course_id={course_id} data={dict(request.data)}")
+
         if not qr_raw:
+            print("[scan_exam] blocked: qr_data missing")
             return bad("qr_data is required", 400)
 
         scan_medium = (request.data.get("scan_medium") or "qr").strip().lower()
         if scan_medium not in ["qr", "nfc"]:
             scan_medium = "qr"
 
+        print(f"[scan_exam] scan_medium={scan_medium}")
+
         try:
             parsed = parse_room_qr(qr_raw)
+            print(f"[scan_exam] parsed={parsed}")
         except ValueError as e:
+            print(f"[scan_exam] parse error: {e}")
             return bad(str(e), 400)
 
-        room, tag, err = _load_room_and_tag(parsed["room_code"], parsed.get("tag_id"))
+        room, tag, err = _load_room_and_tag(
+            parsed["room_code"],
+            parsed.get("tag_id"),
+        )
+
+        print(
+            f"[scan_exam] load_room room_found={bool(room)} "
+            f"tag_found={bool(tag)} err={err}"
+        )
+
         if err:
+            print(f"[scan_exam] blocked: {err}")
             return bad(err, 403 if "tag" in err.lower() else 404)
 
         today = timezone.localdate()
         period = get_or_create_period_from_date(today)
 
-        enroll = self._get_active_enrollment(student, period)
+        print(f"[scan_exam] today={today} period={getattr(period, 'id', None)}")
+
+        enroll = (
+            StudentMonthlyEnrollment.objects
+            .select_related("group__room")
+            .filter(student=student, period=period, status="active")
+            .first()
+        )
+
+        print(f"[scan_exam] enrollment_found={bool(enroll)}")
+
         if not enroll:
+            print("[scan_exam] blocked: not enrolled")
             return bad("Not enrolled", 403)
 
-        # ✅ exam only if teacher/admin unlocked
+        print(
+            f"[scan_exam] exam_unlock={getattr(enroll, 'exam_unlock', None)} "
+            f"group_id={getattr(enroll.group, 'id', None)} "
+            f"group_room_id={getattr(enroll.group, 'room_id', None)} "
+            f"scanned_room_id={getattr(room, 'id', None)} "
+            f"scanned_room_code={getattr(room, 'code', None)}"
+        )
+
         if not getattr(enroll, "exam_unlock", False):
-            return bad("Exam not yet authorized. Wait for your teacher.", 403)
+            print("[scan_exam] blocked: exam locked")
+            return bad("Exam locked. Contact teacher.", 403)
 
         group = enroll.group
+        if group.room_id != room.id:
+            print(
+                f"[scan_exam] blocked: wrong exam room "
+                f"(group.room_id={group.room_id} != room.id={room.id})"
+            )
+            return bad("Wrong exam room", 403)
 
         lat, lng, lat_f, lng_f = _get_lat_lng(request)
-        if lat is None or lng is None:
-            return bad("lat and lng are required for exam scan", 400)
-        if lat_f is None or lng_f is None:
-            return bad("Invalid lat/lng", 400)
+        geo_ok = True
+        distance_m = None
 
-        if room.campus:
-            campus_ok, campus_dist_m, campus_allowed_m = is_within_campus(
-                room.campus, lat_f, lng_f
+        print(f"[scan_exam] raw_geo lat={lat} lng={lng} lat_f={lat_f} lng_f={lng_f}")
+
+        if lat is not None and lng is not None:
+            if lat_f is None or lng_f is None:
+                print("[scan_exam] blocked: invalid lat/lng")
+                return bad("Invalid lat/lng", 400)
+
+            if room.campus:
+                campus_ok, campus_dist_m, campus_allowed_m = is_within_campus(
+                    room.campus, lat_f, lng_f
+                )
+                print(
+                    f"[scan_exam] campus_ok={campus_ok} "
+                    f"dist={campus_dist_m} allowed={campus_allowed_m}"
+                )
+                if not campus_ok:
+                    print("[scan_exam] blocked: outside campus")
+                    return bad(
+                        f"Outside campus area ({campus_dist_m:.1f}m from center, allowed {campus_allowed_m:.1f}m).",
+                        403
+                    )
+
+            geo_ok, distance_m, allowed_m = is_within_room_tag(tag, lat_f, lng_f)
+            print(
+                f"[scan_exam] room_ok={geo_ok} dist={distance_m} allowed={allowed_m}"
             )
-            if not campus_ok:
+            if not geo_ok:
+                print("[scan_exam] blocked: too far from exam room tag")
                 return bad(
-                    f"Outside campus area ({campus_dist_m:.1f}m from center, allowed {campus_allowed_m:.1f}m).",
-                    403,
+                    f"Too far from exam room tag ({distance_m:.1f}m). Allowed radius: {allowed_m:.1f}m",
+                    403
                 )
 
-        geo_ok, distance_m, allowed_m = is_within_room_tag(tag, lat_f, lng_f)
-        if not geo_ok:
-            return bad(
-                f"Too far from exam room tag ({distance_m:.1f}m). Allowed radius: {allowed_m:.1f}m",
-                403,
-            )
+            request.user.set_location(lat_f, lng_f)
 
-        request.user.set_location(lat_f, lng_f)
+        server_scan_dt = timezone.now()
+        client_dt = _parse_client_time(request.data.get("client_time"))
+        scan_dt = client_dt or server_scan_dt
 
-        server_scan_dt, scan_dt = _resolve_exam_scan_dt(request)
-
-        entry, created = self._save_exam_entry(
-            request=request,
-            student=student,
-            room=room,
-            group=group,
-            period=period,
-            today=today,
-            course_id=course_id,
-            qr_raw=qr_raw,
-            scan_medium=scan_medium,
-            scan_dt=scan_dt,
-            lat=lat,
-            lng=lng,
-            geo_ok=geo_ok,
-            distance_m=distance_m,
-            source="scan",
+        print(
+            f"[scan_exam] server_scan_dt={server_scan_dt} "
+            f"client_dt={client_dt} "
+            f"scan_dt={scan_dt}"
         )
+
+        entry, created = StudentExamEntry.objects.get_or_create(
+            period=period,
+            date=today,
+            monthly_group=group,
+            room=room,
+            student=student,
+            course_id=int(course_id) if course_id is not None else None,
+            defaults={
+                "scanned_at": scan_dt,
+                "scan_medium": scan_medium,
+                "scan_payload": qr_raw,
+                "client_latitude": lat,
+                "client_longitude": lng,
+                "distance_m": distance_m,
+                "geo_verified": bool(geo_ok),
+            },
+        )
+
+        print(f"[scan_exam] entry_created={created} entry_id={entry.id}")
+
+        if not created:
+            # garde l'heure initiale
+            entry.client_latitude = lat
+            entry.client_longitude = lng
+            entry.distance_m = distance_m
+            entry.geo_verified = bool(geo_ok)
+            if not getattr(entry, "scan_medium", None):
+                entry.scan_medium = scan_medium
+            if not getattr(entry, "scan_payload", None):
+                entry.scan_payload = qr_raw
+            entry.save()
+            print(f"[scan_exam] existing entry updated entry_id={entry.id}")
+
+        print("[scan_exam] success ✅")
 
         return ok(
             {
                 "exam_entry": StudentExamEntrySerializer(entry).data,
                 "created": created,
-                "already_recorded": not created,
                 "group_id": group.id,
                 "distance_m": distance_m,
                 "geo_verified": geo_ok,
-                "server_ts": int(server_scan_dt.timestamp() * 1000),
-                "client_ts_used": int(scan_dt.timestamp() * 1000),
             },
-            "Exam attendance already recorded ✅" if not created else "Exam access granted ✅",
+            "Exam access granted ✅"
         )
-
     # =====================================================
     # EXAM AUTO GEO TARGET
     # =====================================================
     @action(detail=False, methods=["post"], url_path="exam-geotarget-check")
     def exam_geotarget_check(self, request):
         """
+        POST /api/student/attendance/exam-geotarget-check/
         body:
         {
-          "lat": ...,
-          "lng": ...,
-          "client_ts": ...,
-          "tz_offset_min": ...,
-          "room_code": "R7"   # optional
+        "lat": -26.2,
+        "lng": 28.0,
+        "client_ts": 1771404120123,
+        "tz_offset_min": 120
         }
+
+        Logique:
+        - student doit être enrolled
+        - exam doit être unlock par teacher
+        - room exam doit être connue
+        - campus + room tag doivent matcher
+        - si ok => auto exam entry
         """
         student = request.user.student_profile
-        room_code = (request.data.get("room_code") or "").strip()
-        course_id = request.data.get("course_id", None)
 
         lat, lng, lat_f, lng_f = _get_lat_lng(request)
         if lat is None or lng is None:
@@ -620,31 +701,29 @@ class StudentAttendanceViewSet(ViewSet):
         today = timezone.localdate()
         period = get_or_create_period_from_date(today)
 
-        enroll = self._get_active_enrollment(student, period)
+        enroll = (
+            StudentMonthlyEnrollment.objects
+            .select_related("group__room__campus")
+            .filter(student=student, period=period, status="active")
+            .first()
+        )
         if not enroll:
-            return bad("Not enrolled", 403)
+            return bad("Not enrolled this month", 403)
 
+        # ✅ examen doit être autorisé par le teacher
         if not getattr(enroll, "exam_unlock", False):
-            return bad("Exam not yet authorized. Wait for your teacher.", 403)
+            return bad("Exam not yet authorized by your teacher.", 403)
 
         group = enroll.group
+        room = group.room
+        if not room:
+            return bad("No exam room assigned yet.", 403)
 
-        room = None
-        tag = None
+        tag = RoomScanTag.objects.filter(room=room, is_active=True).first()
+        if not tag:
+            return bad("Exam room tag not configured.", 403)
 
-        if room_code:
-            room = Room.objects.select_related("campus").filter(code=room_code).first()
-            if not room:
-                return bad("Room not found", 404)
-
-            tag = RoomScanTag.objects.filter(room=room, is_active=True).first()
-            if not tag:
-                return bad("Room tag not configured", 403)
-        else:
-            room, tag, err = self._find_room_tag_by_geo(lat_f=lat_f, lng_f=lng_f)
-            if err:
-                return bad(err, 403)
-
+        # ✅ Campus check
         if room.campus:
             campus_ok, campus_dist_m, campus_allowed_m = is_within_campus(
                 room.campus, lat_f, lng_f
@@ -652,54 +731,75 @@ class StudentAttendanceViewSet(ViewSet):
             if not campus_ok:
                 return bad(
                     f"Outside campus area ({campus_dist_m:.1f}m from center, allowed {campus_allowed_m:.1f}m).",
-                    403,
+                    403
                 )
 
+        # ✅ Room tag check
         geo_ok, distance_m, allowed_m = is_within_room_tag(tag, lat_f, lng_f)
         if not geo_ok:
             return bad(
-                f"You are not yet inside the exam room area ({distance_m:.1f}m away, allowed {allowed_m:.1f}m).",
-                403,
+                f"You are not inside the exam room area yet ({distance_m:.1f}m away, allowed {allowed_m:.1f}m).",
+                403
             )
 
         request.user.set_location(lat_f, lng_f)
 
-        _, scan_dt = _resolve_scan_dt(request)
+        server_scan_dt = timezone.now()
+        client_dt = _parse_client_ts(
+            request.data.get("client_ts"),
+            request.data.get("tz_offset_min"),
+        )
+
+        if client_dt:
+            delta_sec = abs((client_dt - server_scan_dt).total_seconds())
+            if delta_sec > 5 * 60:
+                client_dt = None
+
+        scan_dt = client_dt or server_scan_dt
 
         synthetic_payload = f"GEO_TARGET|EXAM|{room.code}|AUTO"
 
-        entry, created = self._save_exam_entry(
-            request=request,
-            student=student,
-            room=room,
-            group=group,
+        entry, created = StudentExamEntry.objects.get_or_create(
             period=period,
-            today=today,
-            course_id=course_id,
-            qr_raw=synthetic_payload,
-            scan_medium="geo",
-            scan_dt=scan_dt,
-            lat=str(lat),
-            lng=str(lng),
-            geo_ok=True,
-            distance_m=distance_m,
-            source="geo_target",
+            date=today,
+            monthly_group=group,
+            room=room,
+            student=student,
+            defaults={
+                "scanned_at": scan_dt,
+                "scan_medium": "geo",
+                "scan_payload": synthetic_payload,
+                "client_latitude": str(lat),
+                "client_longitude": str(lng),
+                "distance_m": distance_m,
+                "geo_verified": True,
+            },
         )
+
+        # ✅ si déjà existant, on ne modifie pas l'heure officielle du premier passage
+        if not created:
+            entry.client_latitude = str(lat)
+            entry.client_longitude = str(lng)
+            entry.distance_m = distance_m
+            entry.geo_verified = True
+            if not getattr(entry, "scan_medium", None):
+                entry.scan_medium = "geo"
+            if not getattr(entry, "scan_payload", None):
+                entry.scan_payload = synthetic_payload
+            entry.save()
 
         return ok(
             {
                 "exam_entry": StudentExamEntrySerializer(entry).data,
                 "created": created,
-                "already_recorded": not created,
                 "group_id": group.id,
-                "room_code": room.code,
-                "room_name": room.name,
                 "distance_m": distance_m,
                 "geo_verified": True,
+                "room_code": room.code,
+                "room_name": room.name,
             },
-            "Exam attendance already recorded ✅" if not created else "Exam auto attendance saved ✅",
+            "Exam access granted via GEO ✅"
         )
-
     # =====================================================
     # RE-ENROLL INTENT
     # =====================================================

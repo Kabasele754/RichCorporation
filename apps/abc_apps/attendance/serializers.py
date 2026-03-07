@@ -123,6 +123,8 @@ class ReenrollmentIntentSerializer(serializers.ModelSerializer):
             "to_period", "to_period_key",
             "will_return", "reason",
             "status",
+             "execute_after",
+            "processed_at",
             "decided_by", "decided_at",
             "created_at",
         ]

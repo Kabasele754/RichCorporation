@@ -251,7 +251,14 @@ CELERY_BEAT_SCHEDULE = {
      "generate-periods-next-year-dec-15": {
         "task": "apps.abc_apps.academics.tasks.ensure_periods_for_next_year",
         "schedule": crontab(minute=0, hour=1, day_of_month=25, month_of_year=12),  # 15 Dec 01:00
-    }
+    },
+     
+      "process-reenrollment-intents-nightly": {
+        "task": "apps.abc_apps.attendance.tasks.process_reenrollment_intents",
+        "schedule": crontab(minute=10, hour=0),
+    },
+     
+     
 }
 
 

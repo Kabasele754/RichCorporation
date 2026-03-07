@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
-
+import calendar
+from datetime import date, datetime, timedelta
 from django.db import transaction
 from django.utils import timezone
 
@@ -9,6 +10,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 
 from apps.abc_apps.academics.models import (
+    AcademicPeriod,
     MonthlyClassGroup,
     Room,
     StudentMonthlyEnrollment,
@@ -803,6 +805,8 @@ class StudentAttendanceViewSet(ViewSet):
     # =====================================================
     # RE-ENROLL INTENT
     # =====================================================
+    # dans StudentAttendanceViewSet
+
     @action(detail=False, methods=["post"], url_path="reenroll-intent")
     def reenroll_intent(self, request):
         student = request.user.student_profile
@@ -819,7 +823,19 @@ class StudentAttendanceViewSet(ViewSet):
 
         today = timezone.localdate()
         from_period = get_or_create_period_from_date(today)
-        to_period = get_or_create_period_from_date(from_period.start_date + timedelta(days=32))
+
+        # ✅ compute next month from year/month
+        if from_period.month == 12:
+            next_year = from_period.year + 1
+            next_month = 1
+        else:
+            next_year = from_period.year
+            next_month = from_period.month + 1
+
+        to_period = AcademicPeriod.objects.get_or_create(
+            year=next_year,
+            month=next_month,
+        )[0]
 
         current = (
             StudentMonthlyEnrollment.objects
@@ -830,9 +846,15 @@ class StudentAttendanceViewSet(ViewSet):
         if not current:
             return bad("No current enrollment", 403)
 
-        # ✅ date logique d’exécution
-        # exemple: lendemain de fin de période
-        execute_after = from_period.end_date + timedelta(days=1)
+        # ✅ last day of current academic month
+        last_day = calendar.monthrange(from_period.year, from_period.month)[1]
+        period_end_date = date(from_period.year, from_period.month, last_day)
+
+        # ✅ process later: at least after 2 days, and not before month end + 1
+        execute_after = max(
+            today + timedelta(days=2),
+            period_end_date + timedelta(days=1),
+        )
 
         with transaction.atomic():
             intent, created = ReenrollmentIntent.objects.update_or_create(
@@ -843,7 +865,9 @@ class StudentAttendanceViewSet(ViewSet):
                     "will_return": will_return,
                     "reason": reason,
                     "status": "pending",
-                    "execute_after": execute_after,   # ✅ nouveau champ conseillé
+                    "execute_after": execute_after,
+                    "processed_at": None,
+                    "target_group": current.group if will_return else None,
                 },
             )
 
@@ -851,9 +875,11 @@ class StudentAttendanceViewSet(ViewSet):
             {
                 "intent": ReenrollmentIntentSerializer(intent).data,
                 "scheduled_for": str(execute_after),
-                "will_return": will_return,
+                "created": created,
+                "from_period": from_period.code,
+                "to_period": to_period.code,
             },
-            "Reenrollment intent saved ✅",
+            "Your re-enrollment choice has been saved and will be processed automatically at the right time ✅",
         )
     # =====================================================
     # HISTORY

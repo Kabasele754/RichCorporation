@@ -7,6 +7,6 @@ from apps.abc_apps.attendance.models import DailyRoomCheckIn, DailyRoomCheckInAp
 
 admin.site.register(DailyRoomCheckIn)
 admin.site.register(DailyRoomCheckInApproval)
-# admin.site.register(StudentExamEntry)
+admin.site.register(StudentExamEntry)
 admin.site.register(ReenrollmentIntent)
 

@@ -824,7 +824,7 @@ class StudentAttendanceViewSet(ViewSet):
         today = timezone.localdate()
         from_period = get_or_create_period_from_date(today)
 
-        # ✅ compute next month from year/month
+        # ✅ compute next academic period
         if from_period.month == 12:
             next_year = from_period.year + 1
             next_month = 1
@@ -846,11 +846,11 @@ class StudentAttendanceViewSet(ViewSet):
         if not current:
             return bad("No current enrollment", 403)
 
-        # ✅ last day of current academic month
+        # ✅ end date of current month
         last_day = calendar.monthrange(from_period.year, from_period.month)[1]
         period_end_date = date(from_period.year, from_period.month, last_day)
 
-        # ✅ process later: at least after 2 days, and not before month end + 1
+        # ✅ execute only later
         execute_after = max(
             today + timedelta(days=2),
             period_end_date + timedelta(days=1),
@@ -867,7 +867,8 @@ class StudentAttendanceViewSet(ViewSet):
                     "status": "pending",
                     "execute_after": execute_after,
                     "processed_at": None,
-                    "target_group": current.group if will_return else None,
+                    "decided_by": None,
+                    "decided_at": None,
                 },
             )
 
@@ -881,35 +882,36 @@ class StudentAttendanceViewSet(ViewSet):
             },
             "Your re-enrollment choice has been saved and will be processed automatically at the right time ✅",
         )
-    # =====================================================
-    # HISTORY
-    # =====================================================
-    @action(detail=False, methods=["get"], url_path="history")
-    def history(self, request):
-        student = request.user.student_profile
-
-        class_scans = (
-            DailyRoomCheckIn.objects
-            .select_related("period", "monthly_group", "room")
-            .filter(student=student)
-            .order_by("-date", "-scanned_at")
-        )
-
-        exam_scans = (
-            StudentExamEntry.objects
-            .select_related("period", "monthly_group", "room")
-            .filter(student=student)
-            .order_by("-date", "-scanned_at")
-        )
-
-        return ok(
-            {
-                "class_scans": DailyRoomCheckInSerializer(class_scans, many=True).data,
-                "exam_scans": StudentExamEntrySerializer(exam_scans, many=True).data,
-            },
-            "History",
-        )      
         
+        # =====================================================
+        # HISTORY
+        # =====================================================
+        @action(detail=False, methods=["get"], url_path="history")
+        def history(self, request):
+            student = request.user.student_profile
+
+            class_scans = (
+                DailyRoomCheckIn.objects
+                .select_related("period", "monthly_group", "room")
+                .filter(student=student)
+                .order_by("-date", "-scanned_at")
+            )
+
+            exam_scans = (
+                StudentExamEntry.objects
+                .select_related("period", "monthly_group", "room")
+                .filter(student=student)
+                .order_by("-date", "-scanned_at")
+            )
+
+            return ok(
+                {
+                    "class_scans": DailyRoomCheckInSerializer(class_scans, many=True).data,
+                    "exam_scans": StudentExamEntrySerializer(exam_scans, many=True).data,
+                },
+                "History",
+            )      
+            
 class TeacherAttendanceViewSet(ViewSet):
     """
     ✅ Teacher scan QR/NFC pour prouver présence (geo room).

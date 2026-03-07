@@ -18,7 +18,6 @@ def process_reenrollment_intents():
             "student",
             "from_period",
             "to_period",
-            "target_group",
         )
         .filter(
             status="pending",
@@ -34,59 +33,115 @@ def process_reenrollment_intents():
     for intent in intents:
         try:
             with transaction.atomic():
-                # ✅ cas: student ne revient pas
+                # ✅ student chose not to return
                 if not intent.will_return:
-                    intent.status = "processed"
+                    intent.status = "rejected"
                     intent.processed_at = timezone.now()
-                    intent.save(update_fields=["status", "processed_at", "updated_at"])
+                    intent.decided_at = timezone.now()
+                    intent.save(
+                        update_fields=[
+                            "status",
+                            "processed_at",
+                            "decided_at",
+                            "updated_at",
+                        ]
+                    )
                     processed += 1
                     continue
 
-                target_group = intent.target_group
-
-                # fallback si target_group absent
-                if not target_group:
-                    current = (
-                        StudentMonthlyEnrollment.objects
-                        .select_related("group")
-                        .filter(
-                            student=intent.student,
-                            period=intent.from_period,
-                        )
-                        .first()
+                # ✅ recover current group from current period enrollment
+                current = (
+                    StudentMonthlyEnrollment.objects
+                    .select_related("group")
+                    .filter(
+                        student=intent.student,
+                        period=intent.from_period,
                     )
-                    if not current or not current.group_id:
-                        intent.status = "failed"
-                        intent.save(update_fields=["status", "updated_at"])
-                        failed += 1
-                        continue
-                    target_group = current.group
+                    .first()
+                )
 
-                # ✅ créer enrollment du mois prochain seulement maintenant
+                if not current or not current.group_id:
+                    intent.status = "rejected"
+                    intent.processed_at = timezone.now()
+                    intent.decided_at = timezone.now()
+                    intent.reason = (
+                        (intent.reason or "") +
+                        "\n[System] Failed to process re-enrollment: source group not found."
+                    ).strip()
+                    intent.save(
+                        update_fields=[
+                            "status",
+                            "processed_at",
+                            "decided_at",
+                            "reason",
+                            "updated_at",
+                        ]
+                    )
+                    failed += 1
+                    continue
+
+                target_group = current.group
+
+                # ✅ create next enrollment only now
                 next_enroll, created = StudentMonthlyEnrollment.objects.get_or_create(
                     student=intent.student,
                     period=intent.to_period,
                     defaults={
                         "group": target_group,
-                        "status": "pending",  # ou "active" selon ta logique
+                        "status": "pending",  # ou active selon ta logique
                     },
                 )
 
-                # optionnel: si déjà existe mais vide/inactif, on peut harmoniser
+                # ✅ optional harmonization
                 if not created:
+                    changed = False
+
                     if getattr(next_enroll, "group_id", None) is None and target_group:
                         next_enroll.group = target_group
-                        next_enroll.save(update_fields=["group"])
+                        changed = True
 
-                intent.status = "processed"
+                    if getattr(next_enroll, "status", None) in [None, "", "cancelled"]:
+                        next_enroll.status = "pending"
+                        changed = True
+
+                    if changed:
+                        next_enroll.save()
+
+                # ✅ mark intent approved
+                intent.status = "approved"
                 intent.processed_at = timezone.now()
-                intent.save(update_fields=["status", "processed_at", "updated_at"])
+                intent.decided_at = timezone.now()
+                intent.save(
+                    update_fields=[
+                        "status",
+                        "processed_at",
+                        "decided_at",
+                        "updated_at",
+                    ]
+                )
                 processed += 1
 
         except Exception as e:
             print(f"[process_reenrollment_intents] failed intent_id={intent.id} error={e}")
-            intent.status = "failed"
-            intent.save(update_fields=["status", "updated_at"])
+            try:
+                intent.status = "rejected"
+                intent.processed_at = timezone.now()
+                intent.decided_at = timezone.now()
+                intent.reason = (
+                    (intent.reason or "") +
+                    f"\n[System] Processing error: {e}"
+                ).strip()
+                intent.save(
+                    update_fields=[
+                        "status",
+                        "processed_at",
+                        "decided_at",
+                        "reason",
+                        "updated_at",
+                    ]
+                )
+            except Exception as inner_e:
+                print(f"[process_reenrollment_intents] secondary save failed intent_id={intent.id} error={inner_e}")
             failed += 1
 
     print(f"[process_reenrollment_intents] done processed={processed} failed={failed}")

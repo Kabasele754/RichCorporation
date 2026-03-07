@@ -161,13 +161,14 @@ class StudentAttendanceViewSet(ViewSet):
             checkin.scan_medium = scan_medium
             checkin.scan_payload = qr_raw
 
-            checkin.client_tz_offset_min = request.data.get("tz_offset_min") or checkin.client_tz_offset_min
+            checkin.client_tz_offset_min = (
+                request.data.get("tz_offset_min") or checkin.client_tz_offset_min
+            )
             checkin.client_latitude = lat
             checkin.client_longitude = lng
             checkin.distance_m = distance_m
             checkin.geo_verified = bool(geo_ok)
 
-            # optionnel si ton modèle possède un champ source / detection_source
             if hasattr(checkin, "source"):
                 checkin.source = source
 
@@ -194,7 +195,10 @@ class StudentAttendanceViewSet(ViewSet):
         except ValueError as e:
             return bad(str(e), 400)
 
-        room, tag, err = _load_room_and_tag(parsed["room_code"], parsed.get("tag_id"))
+        room, tag, err = _load_room_and_tag(
+            parsed["room_code"],
+            parsed.get("tag_id"),
+        )
         if err:
             return bad(err, 403 if "tag" in err.lower() else 404)
 
@@ -223,12 +227,22 @@ class StudentAttendanceViewSet(ViewSet):
             if lat_f is None or lng_f is None:
                 return bad("Invalid lat/lng", 400)
 
-            if room.campus and not is_within_campus(room.campus, lat_f, lng_f):
-                return bad("Outside campus area", 403)
+            if room.campus:
+                campus_ok, campus_dist_m, campus_allowed_m = is_within_campus(
+                    room.campus, lat_f, lng_f
+                )
+                if not campus_ok:
+                    return bad(
+                        f"Outside campus area ({campus_dist_m:.1f}m from center, allowed {campus_allowed_m:.1f}m).",
+                        403
+                    )
 
-            geo_ok, distance_m = is_within_room_tag(tag, lat_f, lng_f)
+            geo_ok, distance_m, allowed_m = is_within_room_tag(tag, lat_f, lng_f)
             if not geo_ok:
-                return bad(f"Too far from room tag ({distance_m:.1f}m)", 403)
+                return bad(
+                    f"Too far from room tag ({distance_m:.1f}m). Allowed radius: {allowed_m:.1f}m",
+                    403
+                )
 
             request.user.set_location(lat_f, lng_f)
 
@@ -291,12 +305,6 @@ class StudentAttendanceViewSet(ViewSet):
           "client_ts": 1771404120123,
           "tz_offset_min": 120
         }
-
-        Logique:
-        - retrouve l'enrollment actif du student
-        - retrouve sa salle attendue
-        - vérifie campus + room tag radius
-        - si ok => auto attendance
         """
         student = request.user.student_profile
 
@@ -327,13 +335,20 @@ class StudentAttendanceViewSet(ViewSet):
         if not tag:
             return bad("Room tag not configured", 403)
 
-        if room.campus and not is_within_campus(room.campus, lat_f, lng_f):
-            return bad("Outside campus area", 403)
+        if room.campus:
+            campus_ok, campus_dist_m, campus_allowed_m = is_within_campus(
+                room.campus, lat_f, lng_f
+            )
+            if not campus_ok:
+                return bad(
+                    f"Outside campus area ({campus_dist_m:.1f}m from center, allowed {campus_allowed_m:.1f}m).",
+                    403
+                )
 
-        geo_ok, distance_m = is_within_room_tag(tag, lat_f, lng_f)
+        geo_ok, distance_m, allowed_m = is_within_room_tag(tag, lat_f, lng_f)
         if not geo_ok:
             return bad(
-                f"You are not yet inside your classroom area ({distance_m:.1f}m away).",
+                f"You are not yet inside your classroom area ({distance_m:.1f}m away, allowed {allowed_m:.1f}m).",
                 403
             )
 
@@ -405,7 +420,10 @@ class StudentAttendanceViewSet(ViewSet):
         except ValueError as e:
             return bad(str(e), 400)
 
-        room, tag, err = _load_room_and_tag(parsed["room_code"], parsed.get("tag_id"))
+        room, tag, err = _load_room_and_tag(
+            parsed["room_code"],
+            parsed.get("tag_id"),
+        )
         if err:
             return bad(err, 403 if "tag" in err.lower() else 404)
 
@@ -436,12 +454,22 @@ class StudentAttendanceViewSet(ViewSet):
             if lat_f is None or lng_f is None:
                 return bad("Invalid lat/lng", 400)
 
-            if room.campus and not is_within_campus(room.campus, lat_f, lng_f):
-                return bad("Outside campus area", 403)
+            if room.campus:
+                campus_ok, campus_dist_m, campus_allowed_m = is_within_campus(
+                    room.campus, lat_f, lng_f
+                )
+                if not campus_ok:
+                    return bad(
+                        f"Outside campus area ({campus_dist_m:.1f}m from center, allowed {campus_allowed_m:.1f}m).",
+                        403
+                    )
 
-            geo_ok, distance_m = is_within_room_tag(tag, lat_f, lng_f)
+            geo_ok, distance_m, allowed_m = is_within_room_tag(tag, lat_f, lng_f)
             if not geo_ok:
-                return bad(f"Too far from exam room tag ({distance_m:.1f}m)", 403)
+                return bad(
+                    f"Too far from exam room tag ({distance_m:.1f}m). Allowed radius: {allowed_m:.1f}m",
+                    403
+                )
 
             request.user.set_location(lat_f, lng_f)
 
@@ -495,7 +523,9 @@ class StudentAttendanceViewSet(ViewSet):
 
         today = timezone.localdate()
         from_period = get_or_create_period_from_date(today)
-        to_period = get_or_create_period_from_date(from_period.start_date + timedelta(days=32))
+        to_period = get_or_create_period_from_date(
+            from_period.start_date + timedelta(days=32)
+        )
 
         current = (
             StudentMonthlyEnrollment.objects
@@ -539,13 +569,20 @@ class StudentAttendanceViewSet(ViewSet):
     @action(detail=False, methods=["get"], url_path="history")
     def history(self, request):
         student = request.user.student_profile
-        class_scans = DailyRoomCheckIn.objects.select_related(
-            "period", "monthly_group", "room"
-        ).filter(student=student).order_by("-date", "-scanned_at")
 
-        exam_scans = StudentExamEntry.objects.select_related(
-            "period", "monthly_group", "room"
-        ).filter(student=student).order_by("-date", "-scanned_at")
+        class_scans = (
+            DailyRoomCheckIn.objects
+            .select_related("period", "monthly_group", "room")
+            .filter(student=student)
+            .order_by("-date", "-scanned_at")
+        )
+
+        exam_scans = (
+            StudentExamEntry.objects
+            .select_related("period", "monthly_group", "room")
+            .filter(student=student)
+            .order_by("-date", "-scanned_at")
+        )
 
         return ok(
             {
@@ -554,7 +591,8 @@ class StudentAttendanceViewSet(ViewSet):
             },
             "History"
         )
-
+        
+        
 class TeacherAttendanceViewSet(ViewSet):
     """
     ✅ Teacher scan QR/NFC pour prouver présence (geo room).

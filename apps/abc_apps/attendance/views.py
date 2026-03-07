@@ -150,17 +150,37 @@ class StudentAttendanceViewSet(ViewSet):
                     "status": status_txt,
                     "scanned_by": "self_scan",
                     "required_confirmations": 3,
-                    "scanned_at": scan_dt,
+                    "scanned_at": scan_dt,   # ✅ première vraie heure
+                    "scan_medium": scan_medium,
+                    "scan_payload": qr_raw,
+                    "client_tz_offset_min": request.data.get("tz_offset_min"),
+                    "client_latitude": lat,
+                    "client_longitude": lng,
+                    "distance_m": distance_m,
+                    "geo_verified": bool(geo_ok),
                 }
             )
 
-            checkin.scanned_at = scan_dt
-            checkin.status = status_txt
+            if created:
+                if hasattr(checkin, "source"):
+                    checkin.source = source
+                checkin.save()
+                return checkin, created, late_by
+
+            # ✅ présence déjà existante:
+            # on NE TOUCHE PAS à scanned_at
+            # on garde l'heure officielle de la première arrivée
+
             checkin.monthly_group = group
 
-            checkin.scan_medium = scan_medium
-            checkin.scan_payload = qr_raw
+            # optionnel: garder le statut le plus "strict"
+            # exemple: si premier scan = late, on ne remplace pas par present
+            # si premier scan = present, on ne remplace pas non plus
+            # donc ici on laisse le status existant
+            # checkin.status = checkin.status
 
+            # ✅ si tu veux juste garder trace du dernier contexte GPS/NFC,
+            # tu peux mettre à jour uniquement ces infos secondaires
             checkin.client_tz_offset_min = (
                 request.data.get("tz_offset_min") or checkin.client_tz_offset_min
             )
@@ -169,13 +189,19 @@ class StudentAttendanceViewSet(ViewSet):
             checkin.distance_m = distance_m
             checkin.geo_verified = bool(geo_ok)
 
-            if hasattr(checkin, "source"):
+            # ✅ ne change scan_medium / payload que si vides
+            if not getattr(checkin, "scan_medium", None):
+                checkin.scan_medium = scan_medium
+            if not getattr(checkin, "scan_payload", None):
+                checkin.scan_payload = qr_raw
+
+            if hasattr(checkin, "source") and not getattr(checkin, "source", None):
                 checkin.source = source
 
             checkin.save()
 
         return checkin, created, late_by
-
+    
     # =========================================================
     # 📚 CLASS ROOM SCAN (QR + NFC)
     # =========================================================

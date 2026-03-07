@@ -11,6 +11,13 @@ from apps.abc_apps.academics.models import StudentMonthlyEnrollment
 @shared_task
 def process_reenrollment_intents():
     today = timezone.localdate()
+    
+    print(f"[process_reenrollment_intents] today={today}")
+    print(
+        ReenrollmentIntent.objects.filter(
+            status="pending"
+        ).values("id", "student_id", "will_return", "execute_after")
+    )
 
     intents = (
         ReenrollmentIntent.objects
@@ -31,6 +38,11 @@ def process_reenrollment_intents():
     failed = 0
 
     for intent in intents:
+        print(
+    f"[process_reenrollment_intents] processing intent_id={intent.id} "
+    f"student={intent.student_id} will_return={intent.will_return} "
+    f"from_period={intent.from_period_id} to_period={intent.to_period_id}"
+)
         try:
             with transaction.atomic():
                 # ✅ student chose not to return

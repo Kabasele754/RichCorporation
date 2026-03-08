@@ -883,34 +883,34 @@ class StudentAttendanceViewSet(ViewSet):
             "Your re-enrollment choice has been saved and will be processed automatically at the right time ✅",
         )
         
-        # =====================================================
-        # HISTORY
-        # =====================================================
-        @action(detail=False, methods=["get"], url_path="history")
-        def history(self, request):
-            student = request.user.student_profile
+    # =====================================================
+    # HISTORY
+    # =====================================================
+    @action(detail=False, methods=["get"], url_path="history")
+    def history(self, request):
+        student = request.user.student_profile
 
-            class_scans = (
-                DailyRoomCheckIn.objects
-                .select_related("period", "monthly_group", "room")
-                .filter(student=student)
-                .order_by("-date", "-scanned_at")
-            )
+        class_scans = (
+            DailyRoomCheckIn.objects
+            .select_related("period", "monthly_group", "room")
+            .filter(student=student)
+            .order_by("-date", "-scanned_at")
+        )
 
-            exam_scans = (
-                StudentExamEntry.objects
-                .select_related("period", "monthly_group", "room")
-                .filter(student=student)
-                .order_by("-date", "-scanned_at")
-            )
+        exam_scans = (
+            StudentExamEntry.objects
+            .select_related("period", "monthly_group", "room")
+            .filter(student=student)
+            .order_by("-date", "-scanned_at")
+        )
 
-            return ok(
-                {
-                    "class_scans": DailyRoomCheckInSerializer(class_scans, many=True).data,
-                    "exam_scans": StudentExamEntrySerializer(exam_scans, many=True).data,
-                },
-                "History",
-            )      
+        return ok(
+            {
+                "class_scans": DailyRoomCheckInSerializer(class_scans, many=True).data,
+                "exam_scans": StudentExamEntrySerializer(exam_scans, many=True).data,
+            },
+            "History",
+        )      
             
 class TeacherAttendanceViewSet(ViewSet):
     """

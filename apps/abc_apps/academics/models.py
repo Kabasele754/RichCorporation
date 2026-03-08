@@ -222,25 +222,54 @@ class MonthlyClassGroup(TimeStampedModel):
 
 # ✅ NOUVEAU : inscription mensuelle de l’étudiant
 class StudentMonthlyEnrollment(TimeStampedModel):
-    period = models.ForeignKey(AcademicPeriod, on_delete=models.CASCADE, related_name="student_enrollments")
-    student = models.ForeignKey(StudentProfile, on_delete=models.CASCADE, related_name="monthly_enrollments")
-    group = models.ForeignKey(MonthlyClassGroup, on_delete=models.PROTECT, related_name="students")
+    period = models.ForeignKey(
+        AcademicPeriod,
+        on_delete=models.CASCADE,
+        related_name="student_enrollments"
+    )
+
+    student = models.ForeignKey(
+        StudentProfile,
+        on_delete=models.CASCADE,
+        related_name="monthly_enrollments"
+    )
+
+    group = models.ForeignKey(
+        MonthlyClassGroup,
+        on_delete=models.PROTECT,
+        related_name="students"
+    )
+
+    # ✅ NEW : groupe du mois précédent
+    source_group = models.ForeignKey(
+        MonthlyClassGroup,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="promoted_students"
+    )
+
     status = models.CharField(
         max_length=12,
-        choices=[("pending", "Pending"), ("active", "Active"), ("inactive", "Inactive")],
+        choices=[
+            ("pending", "Pending"),
+            ("active", "Active"),
+            ("inactive", "Inactive")
+        ],
         default="pending",
     )
-    # ✅ NEW: autorisation examen
+
     exam_unlock = models.BooleanField(default=False)
 
     class Meta:
         unique_together = ("period", "student", "group")
+
         indexes = [
             models.Index(fields=["period", "group"]),
             models.Index(fields=["student", "period"]),
+            models.Index(fields=["source_group"]),
         ]
-
-
+        
 # ✅ EXISTANT (modifié) : assignment teacher↔course
 class TeacherCourseAssignment(TimeStampedModel):
     teacher = models.ForeignKey(

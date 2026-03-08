@@ -1,11 +1,11 @@
 from collections import defaultdict
-
 from celery import shared_task
-from django.db import transaction
 from django.utils import timezone
 
 from apps.abc_apps.attendance.models import ReenrollmentIntent
-from apps.abc_apps.academics.services.promotion_service import promote_students_to_next_period
+from apps.abc_apps.academics.services.promotion_service import (
+    promote_students_for_next_period,
+)
 
 
 @shared_task
@@ -23,10 +23,19 @@ def process_reenrollment_intents():
         .order_by("created_at")
     )
 
+    print(f"[process_reenrollment_intents] today={today}")
+    print(
+        list(
+            ReenrollmentIntent.objects.filter(status="pending").values(
+                "id", "student_id", "will_return", "execute_after"
+            )
+        )
+    )
+
     processed = 0
     failed = 0
 
-    # ✅ on groupe par (from_period, to_period)
+    # grouper par période source -> période cible
     buckets = defaultdict(list)
     for intent in intents:
         buckets[(intent.from_period_id, intent.to_period_id)].append(intent)
@@ -35,26 +44,37 @@ def process_reenrollment_intents():
         yes_intents = [x for x in bucket if x.will_return]
         no_intents = [x for x in bucket if not x.will_return]
 
-        # 1) traiter les "non"
+        # 1) étudiants qui ne reviennent pas
         for intent in no_intents:
             try:
+                now_dt = timezone.now()
                 intent.status = "rejected"
-                intent.processed_at = timezone.now()
-                intent.decided_at = timezone.now()
-                intent.save(update_fields=["status", "processed_at", "decided_at", "updated_at"])
+                intent.processed_at = now_dt
+                intent.decided_at = now_dt
+                intent.save(
+                    update_fields=[
+                        "status",
+                        "processed_at",
+                        "decided_at",
+                        "updated_at",
+                    ]
+                )
                 processed += 1
             except Exception as e:
-                print(f"[process_reenrollment_intents] reject failed intent_id={intent.id} error={e}")
+                print(
+                    f"[process_reenrollment_intents] reject failed "
+                    f"intent_id={intent.id} error={e}"
+                )
                 failed += 1
 
-        # 2) traiter les "oui"
+        # 2) étudiants qui reviennent
         if yes_intents:
             try:
                 from_period = yes_intents[0].from_period
                 to_period = yes_intents[0].to_period
                 student_ids = [x.student_id for x in yes_intents]
 
-                result = promote_students_to_next_period(
+                result = promote_students_for_next_period(
                     from_period=from_period,
                     to_period=to_period,
                     student_ids=student_ids,
@@ -66,7 +86,14 @@ def process_reenrollment_intents():
                     intent.status = "approved"
                     intent.processed_at = now_dt
                     intent.decided_at = now_dt
-                    intent.save(update_fields=["status", "processed_at", "decided_at", "updated_at"])
+                    intent.save(
+                        update_fields=[
+                            "status",
+                            "processed_at",
+                            "decided_at",
+                            "updated_at",
+                        ]
+                    )
 
                 processed += len(yes_intents)
 
@@ -80,16 +107,34 @@ def process_reenrollment_intents():
                 print(f"[process_reenrollment_intents] promotion failed error={e}")
                 for intent in yes_intents:
                     try:
+                        now_dt = timezone.now()
                         intent.status = "rejected"
-                        intent.processed_at = timezone.now()
-                        intent.decided_at = timezone.now()
-                        intent.reason = ((intent.reason or "") + f"\n[System] Promotion failed: {e}").strip()
-                        intent.save(update_fields=["status", "processed_at", "decided_at", "reason", "updated_at"])
-                    except Exception:
-                        pass
+                        intent.processed_at = now_dt
+                        intent.decided_at = now_dt
+                        intent.reason = (
+                            (intent.reason or "") +
+                            f"\n[System] Promotion failed: {e}"
+                        ).strip()
+                        intent.save(
+                            update_fields=[
+                                "status",
+                                "processed_at",
+                                "decided_at",
+                                "reason",
+                                "updated_at",
+                            ]
+                        )
+                    except Exception as inner_e:
+                        print(
+                            f"[process_reenrollment_intents] secondary save failed "
+                            f"intent_id={intent.id} error={inner_e}"
+                        )
                 failed += len(yes_intents)
 
     print(f"[process_reenrollment_intents] done processed={processed} failed={failed}")
-    return {"processed": processed, "failed": failed}
-
-
+    return {
+        "processed": processed,
+        "failed": failed,
+    }
+    
+    

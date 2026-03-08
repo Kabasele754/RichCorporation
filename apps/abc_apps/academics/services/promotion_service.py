@@ -2,7 +2,6 @@ from collections import defaultdict
 from typing import Dict, List, Optional, Tuple
 
 from django.db import transaction
-from django.db.models import Count
 
 from apps.abc_apps.academics.models import (
     AcademicLevel,
@@ -12,57 +11,72 @@ from apps.abc_apps.academics.models import (
     StudentMonthlyEnrollment,
 )
 
-
 MAX_STUDENTS_PER_GROUP = 25
 
 
-def get_next_level(level: AcademicLevel) -> Optional[AcademicLevel]:
+def get_next_level(current_level: AcademicLevel) -> Optional[AcademicLevel]:
+    """
+    Trouve le niveau suivant selon l'ordre.
+    Exemple:
+    Foundation 1 (order=1) -> Foundation 2 (order=2)
+    """
     return (
         AcademicLevel.objects
-        .filter(order__gt=level.order)
+        .filter(order__gt=current_level.order)
         .order_by("order")
         .first()
     )
 
 
-def group_letter_from_index(i: int) -> str:
+def group_name_from_index(index: int) -> str:
     """
     0 -> A
     1 -> B
-    2 -> C
     ...
     25 -> Z
     26 -> A2
-    27 -> B2
     """
-    letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    if i < 26:
-        return letters[i]
-    return f"{letters[i % 26]}{(i // 26) + 1}"
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    if index < 26:
+        return alphabet[index]
+    return f"{alphabet[index % 26]}{(index // 26) + 1}"
 
 
-def get_available_rooms_for_level(level: AcademicLevel) -> List[Room]:
+def get_candidate_rooms() -> List[Room]:
     """
-    Tu peux améliorer cette logique plus tard:
-    - filtrer par campus
-    - filtrer par capacité >= 25
-    - filtrer par building/floor
-    Pour l’instant on prend les rooms actives.
+    Rooms actives triées intelligemment:
+    - d'abord capacité >= 25 si disponible
+    - ensuite par code
     """
-    return list(
-        Room.objects
-        .filter(is_active=True)
-        .order_by("code")
-    )
+    rooms = list(Room.objects.filter(is_active=True).order_by("code"))
+    rooms.sort(key=lambda r: (0 if (r.capacity or 0) >= MAX_STUDENTS_PER_GROUP else 1, r.code))
+    return rooms
 
 
-def choose_room_for_group(
+def pick_room(
+    available_rooms: List[Room],
     used_room_ids: set,
-    candidate_rooms: List[Room],
+    required_size: int,
 ) -> Optional[Room]:
-    for room in candidate_rooms:
+    """
+    Choisit une salle libre.
+    Priorité:
+    - salle non utilisée
+    - capacité >= required_size si possible
+    """
+    # 1. meilleure salle adaptée
+    for room in available_rooms:
+        if room.id in used_room_ids:
+            continue
+        cap = room.capacity or 0
+        if cap == 0 or cap >= required_size:
+            return room
+
+    # 2. fallback: n'importe quelle salle libre
+    for room in available_rooms:
         if room.id not in used_room_ids:
             return room
+
     return None
 
 
@@ -87,66 +101,63 @@ def get_or_create_monthly_group(
     return group
 
 
-def build_next_month_groups_for_level(
+def split_list(items: List, chunk_size: int) -> List[List]:
+    return [items[i:i + chunk_size] for i in range(0, len(items), chunk_size)]
+
+
+def build_next_groups_for_level(
     *,
     from_period: AcademicPeriod,
     to_period: AcademicPeriod,
     current_level: AcademicLevel,
     next_level: AcademicLevel,
-    student_ids: List[int],
+    enrollments: List[StudentMonthlyEnrollment],
     created_by=None,
 ) -> Dict[int, MonthlyClassGroup]:
     """
     Retourne un mapping:
-    student_id -> MonthlyClassGroup du mois suivant
+        student_id -> MonthlyClassGroup du mois suivant
 
     Logique:
-    - on regarde l'ancien groupe des étudiants
-    - on essaye de garder les cohortes ensemble
-    - max 25 students par groupe
-    - on crée automatiquement les MonthlyClassGroup
+    - regrouper par ancien group_name
+    - essayer de garder les cohortes ensemble
+    - split par paquets de 25 max
+    - créer les groupes suivants
     """
+    old_buckets: Dict[str, List[StudentMonthlyEnrollment]] = defaultdict(list)
 
-    # enrollments actifs du mois courant pour ces students
-    current_enrollments = list(
-        StudentMonthlyEnrollment.objects
-        .select_related("group", "group__level", "group__room")
-        .filter(
-            period=from_period,
-            student_id__in=student_ids,
-            status="active",
-            group__level=current_level,
-        )
-    )
+    for enr in enrollments:
+        old_name = enr.group.group_name or "A"
+        old_buckets[old_name].append(enr)
 
-    # regroupe les étudiants par ancien group_name
-    old_group_buckets: Dict[str, List[StudentMonthlyEnrollment]] = defaultdict(list)
-    for enr in current_enrollments:
-        old_group_buckets[enr.group.group_name].append(enr)
+    ordered_old_names = sorted(old_buckets.keys())
 
-    # pour stabilité, on traite A puis B puis C...
-    ordered_old_groups = sorted(old_group_buckets.keys())
-
-    candidate_rooms = get_available_rooms_for_level(next_level)
+    candidate_rooms = get_candidate_rooms()
     used_room_ids = set()
 
     result: Dict[int, MonthlyClassGroup] = {}
-    next_group_index = 0
+    new_group_index = 0
 
-    for old_group_name in ordered_old_groups:
-        enrollments = old_group_buckets[old_group_name]
+    for old_name in ordered_old_names:
+        bucket = old_buckets[old_name]
 
-        # on coupe en paquets de 25
-        for i in range(0, len(enrollments), MAX_STUDENTS_PER_GROUP):
-            chunk = enrollments[i:i + MAX_STUDENTS_PER_GROUP]
+        # garder ordre stable
+        bucket = sorted(bucket, key=lambda x: (x.student_id, x.id))
 
-            new_group_name = group_letter_from_index(next_group_index)
-            next_group_index += 1
+        chunks = split_list(bucket, MAX_STUDENTS_PER_GROUP)
 
-            room = choose_room_for_group(used_room_ids, candidate_rooms)
+        for chunk in chunks:
+            new_group_name = group_name_from_index(new_group_index)
+            new_group_index += 1
+
+            room = pick_room(
+                available_rooms=candidate_rooms,
+                used_room_ids=used_room_ids,
+                required_size=len(chunk),
+            )
             if not room:
                 raise ValueError(
-                    f"No available room found to create group {next_level.label} {new_group_name}"
+                    f"No available room found for {next_level.label} group {new_group_name}"
                 )
 
             used_room_ids.add(room.id)
@@ -166,7 +177,7 @@ def build_next_month_groups_for_level(
 
 
 @transaction.atomic
-def promote_students_to_next_period(
+def promote_students_for_next_period(
     *,
     from_period: AcademicPeriod,
     to_period: AcademicPeriod,
@@ -175,17 +186,14 @@ def promote_students_to_next_period(
 ) -> Dict[str, int]:
     """
     Promotion intelligente:
-    - retrouve le next level
-    - construit les groupes du mois suivant
+    - lit les enrollments actifs du mois courant
+    - détecte le next level
+    - crée les groupes mensuels du mois suivant
     - crée les StudentMonthlyEnrollment
-
-    Retourne un résumé.
     """
-
-    # récupère les enrollments actifs
-    enrollments = list(
+    current_enrollments = list(
         StudentMonthlyEnrollment.objects
-        .select_related("group", "group__level")
+        .select_related("group", "group__level", "group__room")
         .filter(
             period=from_period,
             student_id__in=student_ids,
@@ -193,35 +201,31 @@ def promote_students_to_next_period(
         )
     )
 
-    # bucket par level actuel
     by_level: Dict[int, List[StudentMonthlyEnrollment]] = defaultdict(list)
-    for enr in enrollments:
+    for enr in current_enrollments:
         by_level[enr.group.level_id].append(enr)
 
     created_count = 0
     skipped_count = 0
 
-    for level_id, level_enrollments in by_level.items():
-        current_level = level_enrollments[0].group.level
+    for _, enrollments in by_level.items():
+        current_level = enrollments[0].group.level
         next_level = get_next_level(current_level)
 
         if not next_level:
-            # dernier niveau, on ignore ou on garde selon ta logique
-            skipped_count += len(level_enrollments)
+            skipped_count += len(enrollments)
             continue
 
-        level_student_ids = [x.student_id for x in level_enrollments]
-
-        mapping = build_next_month_groups_for_level(
+        mapping = build_next_groups_for_level(
             from_period=from_period,
             to_period=to_period,
             current_level=current_level,
             next_level=next_level,
-            student_ids=level_student_ids,
+            enrollments=enrollments,
             created_by=created_by,
         )
 
-        for enr in level_enrollments:
+        for enr in enrollments:
             target_group = mapping.get(enr.student_id)
             if not target_group:
                 skipped_count += 1
@@ -229,13 +233,15 @@ def promote_students_to_next_period(
 
             _, created = StudentMonthlyEnrollment.objects.get_or_create(
                 period=to_period,
-                student_id=enr.student_id,
+                student=enr.student,
                 group=target_group,
                 defaults={
                     "status": "pending",
                     "exam_unlock": False,
+                    "source_group": enr.group,  # ✅ très important
                 },
             )
+
             if created:
                 created_count += 1
             else:
